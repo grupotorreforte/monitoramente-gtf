@@ -1,4 +1,13 @@
 export const streams = [
+   {
+    id: '88fm-sede',
+    station: 'Rádio 88 FM - SEDE',
+    city: 'Volta Redonda',
+    state: 'RJ',
+    frequency: '88,7 MHz',
+    provider: 'srvstm',
+    streamUrl: 'https://stm39.srvstm.com:9776/stream'
+  },
   {
     id: 'bh-sede',
     station: 'Maravilha FM - SEDE',

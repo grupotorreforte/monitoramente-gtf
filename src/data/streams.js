@@ -30,12 +30,12 @@ function buildSoundstream({
   }
 }
 
-function buildSrvstm({ id, name, city, frequency, streamUrl }) {
+function buildSrvstm({ id, name, city, state = 'MG', frequency, streamUrl }) {
   return {
     id,
     name,
     city,
-    state: 'MG',
+    state,
     frequency,
     provider: 'Srvstm',
     protocol: 'HTTP Audio',
@@ -50,6 +50,14 @@ function buildSrvstm({ id, name, city, frequency, streamUrl }) {
 }
 
 export const streams = [
+    buildSrvstm({
+    id: '88-fm-sede-belo-horizonte',
+    name: 'Rádio 88 FM - SEDE',
+    city: 'Volta Redonda',
+    state: 'RJ',
+    frequency: '88,7 MHz',
+    streamUrl: 'https://stm39.srvstm.com:9776/stream'
+  }),
   buildSrvstm({
     id: 'maravilha-fm-sede-belo-horizonte',
     name: 'Maravilha FM - SEDE',

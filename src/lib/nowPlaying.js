@@ -1,4 +1,4 @@
-const API_BASE_URL = import.meta.env.VITE_MONITOR_API_URL ?? 'http://localhost:8787'
+import { apiUrl } from './apiBaseUrl'
 
 export const emptyNowPlaying = {
   status: 'idle',
@@ -23,7 +23,7 @@ export async function fetchNowPlaying(metadataUrl) {
   const params = new URLSearchParams({ url: metadataUrl })
 
   try {
-    const response = await fetch(`${API_BASE_URL}/api/now-playing?${params.toString()}`, {
+    const response = await fetch(apiUrl(`/api/now-playing?${params.toString()}`), {
       cache: 'no-store'
     })
 

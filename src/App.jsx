@@ -11,11 +11,11 @@ import {
 } from 'lucide-react'
 import StreamCard from './components/StreamCard'
 import { allStreamIds, streams } from './data/streams'
+import { apiUrl } from './lib/apiBaseUrl'
 import { emptyNowPlaying, fetchNowPlaying } from './lib/nowPlaying'
 import { watchStreams } from './lib/watchStream'
 
 const METADATA_REFRESH_MS = 60000
-const API_BASE_URL = import.meta.env.VITE_MONITOR_API_URL ?? 'http://localhost:8787'
 
 function createProbeState() {
   return Object.fromEntries(
@@ -66,7 +66,7 @@ function buildPlaybackUrl(stream, cacheBust = Date.now()) {
     params.set('fallbackUrl', stream.fallbackUrl)
   }
 
-  return `${API_BASE_URL}/api/audio?${params.toString()}`
+  return apiUrl(`/api/audio?${params.toString()}`)
 }
 
 function getDirectPlaybackUrl(stream) {

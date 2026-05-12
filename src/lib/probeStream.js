@@ -1,4 +1,4 @@
-const API_BASE_URL = import.meta.env.VITE_MONITOR_API_URL ?? 'http://localhost:8787'
+import { apiUrl } from './apiBaseUrl'
 
 export async function probeStream(streamUrl, fallbackUrl) {
   const startedAt = performance.now()
@@ -9,7 +9,7 @@ export async function probeStream(streamUrl, fallbackUrl) {
   }
 
   try {
-    const response = await fetch(`${API_BASE_URL}/api/probe?${params.toString()}`, {
+    const response = await fetch(apiUrl(`/api/probe?${params.toString()}`), {
       cache: 'no-store'
     })
 

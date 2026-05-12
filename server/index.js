@@ -1,12 +1,27 @@
+import fs from 'node:fs'
 import http from 'node:http'
+import path from 'node:path'
 import { URL } from 'node:url'
 
-const PORT = Number(process.env.MONITOR_API_PORT ?? 8787)
+const PORT = Number(process.env.PORT ?? process.env.MONITOR_API_PORT ?? 8787)
+const HOST = process.env.HOST ?? (process.env.PORT ? '0.0.0.0' : '127.0.0.1')
+const DIST_DIR = path.resolve(process.cwd(), 'dist')
 const DEFAULT_TIMEOUT_MS = 9000
 const MAX_BYTES = 32768
 const STREAM_STALL_TIMEOUT_MS = 20000
 const STREAM_RECONNECT_DELAY_MS = 3000
 const STREAM_LEVEL_EMIT_MS = 650
+const MIME_TYPES = {
+  '.css': 'text/css; charset=utf-8',
+  '.html': 'text/html; charset=utf-8',
+  '.js': 'text/javascript; charset=utf-8',
+  '.json': 'application/json; charset=utf-8',
+  '.map': 'application/json; charset=utf-8',
+  '.png': 'image/png',
+  '.svg': 'image/svg+xml',
+  '.txt': 'text/plain; charset=utf-8',
+  '.webp': 'image/webp'
+}
 
 function sendJson(res, statusCode, payload) {
   res.writeHead(statusCode, {
@@ -16,6 +31,47 @@ function sendJson(res, statusCode, payload) {
     'Content-Type': 'application/json; charset=utf-8'
   })
   res.end(JSON.stringify(payload))
+}
+
+function sendStaticFile(res, filePath, statusCode = 200) {
+  const extension = path.extname(filePath)
+
+  res.writeHead(statusCode, {
+    'Cache-Control': extension === '.html' ? 'no-store' : 'public, max-age=31536000, immutable',
+    'Content-Type': MIME_TYPES[extension] ?? 'application/octet-stream'
+  })
+
+  fs.createReadStream(filePath).pipe(res)
+}
+
+function serveStatic(req, res, requestUrl) {
+  if (req.method !== 'GET' && req.method !== 'HEAD') {
+    sendJson(res, 405, { error: 'Método não permitido.' })
+    return
+  }
+
+  const pathname = decodeURIComponent(requestUrl.pathname)
+  const requestedPath = pathname === '/' ? '/index.html' : pathname
+  const filePath = path.resolve(DIST_DIR, `.${requestedPath}`)
+
+  if (!filePath.startsWith(DIST_DIR)) {
+    sendJson(res, 403, { error: 'Acesso negado.' })
+    return
+  }
+
+  if (fs.existsSync(filePath) && fs.statSync(filePath).isFile()) {
+    sendStaticFile(res, filePath)
+    return
+  }
+
+  const indexPath = path.join(DIST_DIR, 'index.html')
+
+  if (fs.existsSync(indexPath)) {
+    sendStaticFile(res, indexPath)
+    return
+  }
+
+  sendJson(res, 404, { error: 'Build frontend não encontrado. Execute npm run build.' })
 }
 
 function sendSse(res, event, payload) {
@@ -577,12 +633,12 @@ const server = http.createServer(async (req, res) => {
       return
     }
 
-    sendJson(res, 404, { error: 'Rota não encontrada.' })
+    serveStatic(req, res, requestUrl)
   } catch (error) {
     sendJson(res, 500, { error: error.message })
   }
 })
 
-server.listen(PORT, '127.0.0.1', () => {
-  console.log(`Monitor API listening on http://localhost:${PORT}`)
+server.listen(PORT, HOST, () => {
+  console.log(`Monitor app listening on http://${HOST}:${PORT}`)
 })

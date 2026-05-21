@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {
   ChevronDown,
   Headphones,
@@ -16,6 +16,7 @@ import { emptyNowPlaying, fetchNowPlaying } from './lib/nowPlaying'
 import { watchStreams } from './lib/watchStream'
 
 const METADATA_REFRESH_MS = 60000
+const WAVEFORM_LEVEL_UPDATE_MS = 90
 
 function createProbeState() {
   return Object.fromEntries(
@@ -79,6 +80,7 @@ export default function App() {
   const sourceNodesRef = useRef({})
   const gainNodesRef = useRef({})
   const previousStatusesRef = useRef({})
+  const lastWaveformUpdateRef = useRef({})
   const [probeStates, setProbeStates] = useState(createProbeState)
   const [nowPlayingStates, setNowPlayingStates] = useState(createNowPlayingState)
   const [audioStates, setAudioStates] = useState(createAudioState)
@@ -331,17 +333,6 @@ export default function App() {
         [stream.id]: probe
       }))
 
-      if (probe.status === 'online') {
-        const nextPeak = Math.max(0.03, Math.min(1, ((probe.levelL ?? 1) + (probe.levelR ?? 1)) / 20))
-        setWaveformPeaks((state) => {
-          const current = state[stream.id] ?? new Array(96).fill(0.03)
-          return {
-            ...state,
-            [stream.id]: [...current.slice(1), nextPeak]
-          }
-        })
-      }
-
       const previousStatus = previousStatusesRef.current[stream.id]
       previousStatusesRef.current[stream.id] = probe.status
 
@@ -528,9 +519,12 @@ export default function App() {
     }))
   }
 
-  const handleStartMonitoring = () => {
+  const handleStartMonitoring = async () => {
     setSoloStreamId(null)
     setHasStartedAudioMonitoring(true)
+
+    const playedStreamIds = await startStreams(monitoredStreams, null)
+    const playedIdSet = new Set(playedStreamIds)
 
     setAudioStates((state) => ({
       ...state,
@@ -539,7 +533,7 @@ export default function App() {
           stream.id,
           {
             ...state[stream.id],
-            isPlaying: false
+            isPlaying: playedIdSet.has(stream.id)
           }
         ])
       )
@@ -608,6 +602,26 @@ export default function App() {
   const handleCycleColumns = () => {
     setColumns((current) => (current === 4 ? 1 : current + 1))
   }
+
+  const handleMeterLevels = useCallback((streamId, levels) => {
+    const [left = 0, right = 0] = levels ?? []
+    const nextPeak = Math.max(0.03, Math.min(1, ((left + right) / 2) * 8))
+    const now = performance.now()
+
+    if (now - (lastWaveformUpdateRef.current[streamId] ?? 0) < WAVEFORM_LEVEL_UPDATE_MS) {
+      return
+    }
+
+    lastWaveformUpdateRef.current[streamId] = now
+
+    setWaveformPeaks((state) => {
+      const current = state[streamId] ?? new Array(96).fill(0.03)
+      return {
+        ...state,
+        [streamId]: [...current.slice(1), nextPeak]
+      }
+    })
+  }, [])
 
   return (
     <main className="app-shell">
@@ -756,6 +770,7 @@ export default function App() {
               sourceNode={meterNodes[stream.id]?.sourceNode ?? null}
               waveformPeaks={waveformPeaks[stream.id]}
               isMeterActive={hasStartedAudioMonitoring}
+              onMeterLevels={handleMeterLevels}
               onTogglePlay={handleTogglePlay}
               onToggleMute={handleToggleMute}
               onVolumeChange={handleVolumeChange}

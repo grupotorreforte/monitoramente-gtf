@@ -541,14 +541,6 @@ https://srv.soundstream.com.br/listen/maravilhafmaraxa/livehttps://srv.soundstre
 *Link de streaming principal:* https://srv.soundstream.com.br/listen/maravilhafmaraxa/live*Streaming HTTP:* http://srv.soundstream.com.br:8290/live
 
 
-
-
-
-Preciso que você revise também os streamings de Ipatinga, UBÁ, montes claros, Uberlandia, Uberaba, Leopoldina e Araxá. Pois eles não estão modulando, PORÉM seus links de streaming estão funcionando. Eu preciso que a aplicação assim que ela for aberta, em vez do Botão ESCUTAR TODOS, seja INICIAR MONITORAMENTO, e quando for clicado comece a modular no audio meter de todos os streamings, apenas CAMBUI nao vai funcionar pois ela não tem audio ainda... As modulações do AUDIO METER sejam constantes...
-
-Parece que o arquivo streams 2.js está faltando o link de streams de algumas rádios que está completo no arquivo streams.js 
-
-
 LINKS PARA CONFERÊNCIA: 
 
 Belo Horizonte - MG	-	-	-	-	https://stm19.srvstm.com:7080/stream

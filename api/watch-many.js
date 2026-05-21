@@ -1,8 +1,5 @@
 import { getWatchMaxRuntimeMs, handleOptions, monitorStreamForSse, sendJson, sendSse } from './_monitor.js'
 
-export const config = {
-  maxDuration: 30
-}
 
 export default async function handler(req, res) {
   if (handleOptions(req, res)) return
@@ -40,6 +37,11 @@ export default async function handler(req, res) {
 
   const startedAt = Date.now()
   const shouldStop = () => closed || Date.now() - startedAt > getWatchMaxRuntimeMs()
+  const keepAliveInterval = setInterval(() => {
+    if (!closed) {
+      res.write(': keepalive\n\n')
+    }
+  }, 15000)
 
   streamsToWatch.forEach((stream) => {
     sendSse(res, 'status', {
@@ -50,9 +52,7 @@ export default async function handler(req, res) {
       latencyMs: null,
       receivedBytes: 0,
       httpStatus: null,
-      contentType: null,
-      levelL: 0,
-      levelR: 0
+      contentType: null
     })
   })
 
@@ -67,8 +67,8 @@ export default async function handler(req, res) {
       })
     )
   )
-
   if (!res.writableEnded) {
+    clearInterval(keepAliveInterval)
     res.end()
   }
 }

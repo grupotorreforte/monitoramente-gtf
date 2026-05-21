@@ -11,10 +11,15 @@ function StatusDot({ status, muted }) {
   )
 }
 
-function AudioMeter({ active, audioContext, sourceNode, levels }) {
+function AudioMeter({ active, audioContext, sourceNode, onLevels }) {
   return (
     <div className="vu-wrap" aria-label="Medidor L R">
-      <AudioMeterReact active={active} audioContext={audioContext} sourceNode={sourceNode} levels={levels} />
+      <AudioMeterReact
+        active={active}
+        audioContext={audioContext}
+        sourceNode={sourceNode}
+        onLevels={onLevels}
+      />
     </div>
   )
 }
@@ -95,6 +100,7 @@ export default function StreamCard({
   sourceNode,
   waveformPeaks,
   isMeterActive,
+  onMeterLevels,
   onToggleMute,
   onVolumeChange,
   onReconnect,
@@ -103,18 +109,20 @@ export default function StreamCard({
   const isMetadataOffline = stream.metadataOfflineMeansDown && nowPlaying.title?.trim().toLowerCase() === 'station offline'
   const isOnline = probe.status === 'online' && !isMetadataOffline
   const isOffline = ['offline', 'timeout'].includes(probe.status) || isMetadataOffline
+  const isAudioAnalyzing = isMeterActive && (audioState.isPlaying || isOnline)
   const location = stream.city === 'Não informado' ? stream.state : `${stream.city} - ${stream.state}`
   const title = nowPlaying.title && !isMetadataOffline ? nowPlaying.title : isMetadataOffline ? '' : `${stream.frequency} - ${stream.name}`
-  const meterLevels = {
-    left: probe.levelL ?? 0,
-    right: probe.levelR ?? 0
-  }
 
   return (
     <article className={`stream-card stream-${isOffline ? 'offline' : probe.status}`}>
       <div className="meter-column">
-        <AudioMeter active={isMeterActive && isOnline} audioContext={audioContext} sourceNode={sourceNode} levels={meterLevels} />
-        <Fader volume={audioState.volume} onVolumeChange={(volume) => onVolumeChange(stream.id, volume)} />
+      <AudioMeter
+        active={isAudioAnalyzing}
+        audioContext={audioContext}
+        sourceNode={sourceNode}
+        onLevels={(levels) => onMeterLevels(stream.id, levels)}
+      />
+      <Fader volume={audioState.volume} onVolumeChange={(volume) => onVolumeChange(stream.id, volume)} />
       </div>
 
       <div className="stream-body">
@@ -129,7 +137,7 @@ export default function StreamCard({
             <span>{title}</span>
         </div> */}
 
-        <Waveform active={isOnline} audioElement={audioElement} peaks={waveformPeaks} />
+        <Waveform active={isAudioAnalyzing} audioElement={audioElement} peaks={waveformPeaks} />
 
         <footer className="stream-footer">
           <span className={isOffline ? 'state-offline' : 'state-online'}>

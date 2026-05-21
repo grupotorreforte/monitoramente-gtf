@@ -8,7 +8,7 @@ function drawMeter(canvas, volume, channelIndex) {
   const context = canvas.getContext('2d')
   const width = canvas.width
   const height = canvas.height
-  const level = Math.max(0, Math.min(1, volume * 5.5))
+  const level = Math.max(0, Math.min(1, volume * 8))
   const fillHeight = Math.max(2, Math.round(height * level))
   const gradient = context.createLinearGradient(0, height, 0, 0)
 
@@ -45,22 +45,27 @@ function readVolume(analyser, buffer) {
   return Math.sqrt(sum / buffer.length)
 }
 
-export default function AudioMeterReact({ audioContext, sourceNode, active, levels }) {
+export default function AudioMeterReact({ audioContext, sourceNode, active, levels, onLevels }) {
   const canvasRefs = useRef([])
   const volumesRef = useRef([0, 0])
-  const targetVolumesRef = useRef([0, 0])
+  const onLevelsRef = useRef(onLevels)
+/*   const targetVolumesRef = useRef([0, 0]) */
+
+  useEffect(() => {
+    onLevelsRef.current = onLevels
+  }, [onLevels])
 
   useEffect(() => {
     canvasRefs.current.forEach((canvas, index) => {
       if (canvas) drawMeter(canvas, 0, index)
     })
   }, [])
-
+/*
   useEffect(() => {
     if (!levels) return
 
     targetVolumesRef.current = [levels.left ?? 0, levels.right ?? 0].map((level) => level / 55)
-  }, [levels])
+  }, [levels]) */
 
   useEffect(() => {
     if (!active) {
@@ -68,10 +73,11 @@ export default function AudioMeterReact({ audioContext, sourceNode, active, leve
       canvasRefs.current.forEach((canvas, index) => {
         if (canvas) drawMeter(canvas, 0, index)
       })
+      onLevelsRef.current?.([0, 0])
       return undefined
     }
 
-    if (levels) {
+/*     if (levels) {
       let animationFrameId = 0
 
       const render = () => {
@@ -95,7 +101,7 @@ export default function AudioMeterReact({ audioContext, sourceNode, active, leve
       return () => {
         window.cancelAnimationFrame(animationFrameId)
       }
-    }
+    } */
 
     if (!audioContext || !sourceNode) return undefined
 
@@ -117,11 +123,12 @@ export default function AudioMeterReact({ audioContext, sourceNode, active, leve
     const render = () => {
       analysers.forEach((analyser, index) => {
         const volume = readVolume(analyser, buffers[index])
-        volumesRef.current[index] = Math.max(volume, volumesRef.current[index] * AVERAGING)
+        volumesRef.current[index] = volumesRef.current[index] * 0.82 + volume * 0.18
 
         const canvas = canvasRefs.current[index]
         if (canvas) drawMeter(canvas, volumesRef.current[index], index)
       })
+      onLevelsRef.current?.([...volumesRef.current])
 
       animationFrameId = window.requestAnimationFrame(render)
     }
@@ -138,7 +145,7 @@ export default function AudioMeterReact({ audioContext, sourceNode, active, leve
       analysers.forEach((analyser) => analyser.disconnect())
       splitter.disconnect()
     }
-  }, [active, audioContext, sourceNode, Boolean(levels)])
+  }, [active, audioContext, sourceNode])
 
   return (
     <div className="audio-meter-react" aria-label="AudioMeter.React L R">

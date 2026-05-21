@@ -24,7 +24,6 @@ export function watchStream({ streamUrl, fallbackUrl, onStatus, onError }) {
       contentType: null
     })
   }
-
   return () => eventSource.close()
 }
 

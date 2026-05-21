@@ -42,29 +42,6 @@ export function normalizeSong(song) {
   }
 }
 
-export function estimateLevels(chunk, sequence) {
-  if (!chunk?.length) {
-    return { levelL: 0, levelR: 0 }
-  }
-
-  let leftSeed = 0
-  let rightSeed = 0
-  const sampleSize = Math.min(chunk.length, 96)
-
-  for (let index = 0; index < sampleSize; index += 2) {
-    leftSeed += chunk[index] ?? 0
-    rightSeed += chunk[index + 1] ?? chunk[index] ?? 0
-  }
-
-  const leftWave = Math.abs(Math.sin((leftSeed + sequence * 31) / 120))
-  const rightWave = Math.abs(Math.sin((rightSeed + sequence * 47) / 135))
-
-  return {
-    levelL: Math.max(2, Math.min(10, Math.round(leftWave * 8) + 2)),
-    levelR: Math.max(2, Math.min(10, Math.round(rightWave * 8) + 2))
-  }
-}
-
 export async function fetchNowPlaying(metadataUrl) {
   if (!metadataUrl) {
     return {
@@ -211,7 +188,6 @@ export async function monitorStreamForSse({ id, url, fallbackUrl, res, shouldSto
     let stallTimer = null
     let lastLevelEmitAt = 0
     let receivedBytes = 0
-    let sequence = 0
 
     const resetStallTimer = () => {
       clearTimeout(stallTimer)
@@ -249,7 +225,6 @@ export async function monitorStreamForSse({ id, url, fallbackUrl, res, shouldSto
         }
 
         receivedBytes += value?.byteLength ?? 0
-        sequence += 1
         const now = performance.now()
 
         if (now - lastLevelEmitAt >= STREAM_LEVEL_EMIT_MS) {
@@ -262,8 +237,7 @@ export async function monitorStreamForSse({ id, url, fallbackUrl, res, shouldSto
             latencyMs: Math.round(performance.now() - startedAt),
             receivedBytes,
             httpStatus: response.status,
-            contentType: response.headers.get('content-type'),
-            ...estimateLevels(value, sequence)
+            contentType: response.headers.get('content-type')
           })
         }
       }
@@ -287,9 +261,7 @@ export async function monitorStreamForSse({ id, url, fallbackUrl, res, shouldSto
       latencyMs: null,
       receivedBytes: 0,
       httpStatus: null,
-      contentType: null,
-      levelL: 0,
-      levelR: 0
+      contentType: null
     })
   }
 }

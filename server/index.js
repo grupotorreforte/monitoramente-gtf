@@ -40,10 +40,8 @@ function sendStaticFile(res, filePath, statusCode = 200) {
     'Cache-Control': extension === '.html' ? 'no-store' : 'public, max-age=31536000, immutable',
     'Content-Type': MIME_TYPES[extension] ?? 'application/octet-stream'
   })
-
   fs.createReadStream(filePath).pipe(res)
 }
-
 function serveStatic(req, res, requestUrl) {
   if (req.method !== 'GET' && req.method !== 'HEAD') {
     sendJson(res, 405, { error: 'Método não permitido.' })
@@ -119,29 +117,6 @@ function normalizeSong(song) {
   return {
     title: artist && title ? `${artist} - ${title}` : title,
     artist
-  }
-}
-
-function estimateLevels(chunk, sequence) {
-  if (!chunk?.length) {
-    return { levelL: 0, levelR: 0 }
-  }
-
-  let leftSeed = 0
-  let rightSeed = 0
-  const sampleSize = Math.min(chunk.length, 96)
-
-  for (let index = 0; index < sampleSize; index += 2) {
-    leftSeed += chunk[index] ?? 0
-    rightSeed += chunk[index + 1] ?? chunk[index] ?? 0
-  }
-
-  const leftWave = Math.abs(Math.sin((leftSeed + sequence * 31) / 120))
-  const rightWave = Math.abs(Math.sin((rightSeed + sequence * 47) / 135))
-
-  return {
-    levelL: Math.max(2, Math.min(10, Math.round(leftWave * 8) + 2)),
-    levelR: Math.max(2, Math.min(10, Math.round(rightWave * 8) + 2))
   }
 }
 
@@ -320,7 +295,6 @@ async function monitorContinuousStream({ id, url, fallbackUrl, res, isClosed }) 
       let stallTimer = null
       const startedAt = performance.now()
       let lastLevelEmitAt = 0
-      let sequence = 0
 
       const resetStallTimer = () => {
         clearTimeout(stallTimer)
@@ -359,9 +333,7 @@ async function monitorContinuousStream({ id, url, fallbackUrl, res, isClosed }) 
           }
 
           receivedBytes += value?.byteLength ?? 0
-          sequence += 1
           const now = performance.now()
-          const levels = estimateLevels(value, sequence)
 
           if (lastStatus !== 'online' && receivedBytes > 0) {
             lastStatus = 'online'
@@ -373,8 +345,7 @@ async function monitorContinuousStream({ id, url, fallbackUrl, res, isClosed }) 
               latencyMs: Math.round(performance.now() - startedAt),
               receivedBytes,
               httpStatus: response.status,
-              contentType: response.headers.get('content-type'),
-              ...levels
+              contentType: response.headers.get('content-type')
             })
           } else if (lastStatus === 'online' && now - lastLevelEmitAt >= STREAM_LEVEL_EMIT_MS) {
             lastLevelEmitAt = now
@@ -385,8 +356,7 @@ async function monitorContinuousStream({ id, url, fallbackUrl, res, isClosed }) 
               latencyMs: Math.round(performance.now() - startedAt),
               receivedBytes,
               httpStatus: response.status,
-              contentType: response.headers.get('content-type'),
-              ...levels
+              contentType: response.headers.get('content-type')
             })
           }
         }

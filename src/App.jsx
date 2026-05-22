@@ -32,6 +32,20 @@ function createProbeState() {
   )
 }
 
+function createFmProbeState() {
+  return Object.fromEntries(
+    streams.map((stream) => [
+      stream.id,
+      {
+        status: stream.fmMonitorUrl ? 'idle' : 'unconfigured',
+        detail: stream.fmMonitorUrl ? 'Aguardando primeira verificação do FM.' : 'Link de monitoramento FM pendente.',
+        checkedAt: null,
+        latencyMs: null
+      }
+    ])
+  )
+}
+
 function createNowPlayingState() {
   return Object.fromEntries(streams.map((stream) => [stream.id, { ...emptyNowPlaying }]))
 }
@@ -42,7 +56,7 @@ function createAudioState() {
       stream.id,
       {
         isPlaying: false,
-        isMuted: false,
+        isMuted: true,
         volume: 1
       }
     ])
@@ -82,6 +96,7 @@ export default function App() {
   const previousStatusesRef = useRef({})
   const lastWaveformUpdateRef = useRef({})
   const [probeStates, setProbeStates] = useState(createProbeState)
+  const [fmProbeStates, setFmProbeStates] = useState(createFmProbeState)
   const [nowPlayingStates, setNowPlayingStates] = useState(createNowPlayingState)
   const [audioStates, setAudioStates] = useState(createAudioState)
   const [meterNodes, setMeterNodes] = useState({})
@@ -94,7 +109,6 @@ export default function App() {
   const [selectedStreamIds, setSelectedStreamIds] = useState(allStreamIds)
   const [singleStreamId, setSingleStreamId] = useState(allStreamIds[0])
   const [isFilterOpen, setIsFilterOpen] = useState(false)
-  const [soloStreamId, setSoloStreamId] = useState(null)
   const [hasStartedAudioMonitoring, setHasStartedAudioMonitoring] = useState(false)
 
   const selectedIdSet = useMemo(() => new Set(selectedStreamIds), [selectedStreamIds])
@@ -116,8 +130,8 @@ export default function App() {
         ? streams.find((stream) => stream.id === selectedStreamIds[0])?.name
         : `${selectedStreamIds.length} rádios selecionadas`
 
-  const getEffectiveMute = (streamId, audioState = audioStates[streamId], activeSoloId = soloStreamId) =>
-    Boolean(audioState?.isMuted || !activeSoloId || activeSoloId !== streamId)
+  const getEffectiveMute = (streamId, audioState = audioStates[streamId]) =>
+    Boolean(audioState?.isMuted)
 
   useEffect(() => {
     streams.forEach((stream) => {
@@ -151,7 +165,7 @@ export default function App() {
     }
   }, [])
 
-  const ensureAudioGraph = (streamId, activeSoloId = soloStreamId) => {
+  const ensureAudioGraph = (streamId) => {
     const audio = audioRefs.current[streamId]
     if (!audio) return null
 
@@ -173,7 +187,7 @@ export default function App() {
 
       audio.muted = false
       audio.volume = 1
-      gainNode.gain.value = getEffectiveMute(streamId, currentAudioState, activeSoloId) ? 0 : currentAudioState?.volume ?? 1
+      gainNode.gain.value = getEffectiveMute(streamId, currentAudioState) ? 0 : currentAudioState?.volume ?? 1
       sourceNode.connect(gainNode)
       gainNode.connect(audioContextRef.current.destination)
 
@@ -201,16 +215,12 @@ export default function App() {
     gainNode.gain.setTargetAtTime(isMuted ? 0 : volume, audioContext.currentTime, 0.015)
   }
 
-  const syncOutputGain = (streamId, audioState = audioStates[streamId], activeSoloId = soloStreamId) => {
-    setOutputGain(streamId, audioState?.volume ?? 1, getEffectiveMute(streamId, audioState, activeSoloId))
-  }
-
-  const prepareAudio = (stream, activeSoloId = soloStreamId) => {
+  const prepareAudio = (stream) => {
     const audio = audioRefs.current[stream.id]
     if (!audio) return false
 
     try {
-      ensureAudioGraph(stream.id, activeSoloId)
+      ensureAudioGraph(stream.id)
       return true
     } catch {
       return false
@@ -242,8 +252,8 @@ export default function App() {
     }
   }
 
-  const startStreams = async (streamsToStart, activeSoloId = soloStreamId) => {
-    const preparedStreams = streamsToStart.filter((stream) => prepareAudio(stream, activeSoloId))
+  const startStreams = async (streamsToStart) => {
+    const preparedStreams = streamsToStart.filter((stream) => prepareAudio(stream))
 
     const results = await Promise.allSettled(preparedStreams.map((stream) => playPreparedAudio(stream)))
     const playedStreamIds = []
@@ -276,9 +286,6 @@ export default function App() {
       )
     )
 
-    if (soloStreamId && !selectedIdSet.has(soloStreamId)) {
-      setSoloStreamId(null)
-    }
   }, [selectedIdSet])
 
   useEffect(() => {
@@ -370,52 +377,56 @@ export default function App() {
     }
   }, [monitoredStreams])
 
-  const handleTogglePlay = async (streamId) => {
-    const audio = audioRefs.current[streamId]
-    if (!audio) return
-
-    const currentState = audioStates[streamId]
-
-    if (currentState.isPlaying) {
-      audio.pause()
-      audio.currentTime = 0
-      setAudioStates((state) => ({
-        ...state,
-        [streamId]: {
-          ...state[streamId],
-          isPlaying: false
-        }
+  useEffect(() => {
+    const fmStreamsToWatch = monitoredStreams
+      .filter((stream) => stream.fmMonitorUrl)
+      .map((stream) => ({
+        id: stream.id,
+        streamUrl: stream.fmMonitorUrl,
+        fallbackUrl: stream.fmFallbackUrl
       }))
-      return
+
+    setFmProbeStates((state) => {
+      const nextState = { ...state }
+      monitoredStreams.forEach((stream) => {
+        if (!stream.fmMonitorUrl) {
+          nextState[stream.id] = {
+            ...nextState[stream.id],
+            status: 'unconfigured',
+            detail: 'Link de monitoramento FM pendente.',
+            checkedAt: null,
+            latencyMs: null
+          }
+        }
+      })
+      return nextState
+    })
+
+    if (fmStreamsToWatch.length === 0) {
+      return () => {}
     }
 
-    try {
-      const stream = streams.find((item) => item.id === streamId)
-      const playedStreamIds = stream ? await startStreams([stream]) : []
-      if (!playedStreamIds.includes(streamId)) {
-        throw new Error('Falha ao reproduzir áudio.')
+    const handleFmStatus = (probe) => {
+      setFmProbeStates((state) => ({
+        ...state,
+        [probe.id]: probe
+      }))
+    }
+
+    const cleanupWatcher = watchStreams({
+      streams: fmStreamsToWatch,
+      onStatus: handleFmStatus,
+      onError: (probe) => {
+        fmStreamsToWatch.forEach((stream) => {
+          handleFmStatus({ id: stream.id, ...probe })
+        })
       }
+    })
 
-      setAudioStates((state) => ({
-        ...state,
-        [streamId]: {
-          ...state[streamId],
-          isPlaying: true
-        }
-      }))
-    } catch {
-      setProbeStates((state) => ({
-        ...state,
-        [streamId]: {
-          ...state[streamId],
-          status: 'offline',
-          detail: 'O navegador bloqueou a reprodução ou o stream falhou.',
-          checkedAt: new Date().toISOString(),
-          latencyMs: state[streamId].latencyMs
-        }
-      }))
+    return () => {
+      cleanupWatcher()
     }
-  }
+  }, [monitoredStreams])
 
   const handleToggleMute = (streamId) => {
     const audio = audioRefs.current[streamId]
@@ -483,47 +494,10 @@ export default function App() {
     }))
   }
 
-  const handleSolo = async (streamId) => {
-    const nextSoloId = soloStreamId === streamId ? null : streamId
-    const stream = monitoredStreams.find((item) => item.id === streamId)
-    const playedStreamIds = []
-
-    setHasStartedAudioMonitoring(true)
-    setSoloStreamId(nextSoloId)
-
-    Object.entries(audioRefs.current).forEach(([id, audio]) => {
-      if (!nextSoloId || id !== streamId) {
-        audio.pause()
-      }
-    })
-
-    if (stream && nextSoloId) {
-      const playedIds = await startStreams([stream], nextSoloId)
-      playedStreamIds.push(...playedIds)
-      syncOutputGain(stream.id, audioStates[stream.id], nextSoloId)
-    }
-
-    const playedIdSet = new Set(playedStreamIds)
-
-    setAudioStates((state) => ({
-      ...state,
-      ...Object.fromEntries(
-        monitoredStreams.map((stream) => [
-          stream.id,
-          {
-            ...state[stream.id],
-            isPlaying: stream.id === streamId ? playedIdSet.has(stream.id) : false
-          }
-        ])
-      )
-    }))
-  }
-
   const handleStartMonitoring = async () => {
-    setSoloStreamId(null)
     setHasStartedAudioMonitoring(true)
 
-    const playedStreamIds = await startStreams(monitoredStreams, null)
+    const playedStreamIds = await startStreams(monitoredStreams)
     const playedIdSet = new Set(playedStreamIds)
 
     setAudioStates((state) => ({
@@ -587,14 +561,12 @@ export default function App() {
   const handleMonitorSingle = () => {
     if (!singleStreamId) return
     setSelectedStreamIds([singleStreamId])
-    setSoloStreamId(null)
     setHasStartedAudioMonitoring(false)
     setIsFilterOpen(false)
   }
 
   const handleMonitorAll = () => {
     setSelectedStreamIds(allStreamIds)
-    setSoloStreamId(null)
     setHasStartedAudioMonitoring(false)
     setIsFilterOpen(false)
   }
@@ -758,19 +730,17 @@ export default function App() {
               key={stream.id}
               stream={stream}
               probe={probeStates[stream.id]}
+              fmProbe={fmProbeStates[stream.id]}
               nowPlaying={nowPlayingStates[stream.id]}
               audioState={audioStates[stream.id]}
-              audioElement={audioRefs.current[stream.id]}
               audioContext={meterNodes[stream.id]?.audioContext ?? null}
               sourceNode={meterNodes[stream.id]?.sourceNode ?? null}
               waveformPeaks={waveformPeaks[stream.id]}
               isMeterActive={hasStartedAudioMonitoring}
               onMeterLevels={handleMeterLevels}
-              onTogglePlay={handleTogglePlay}
               onToggleMute={handleToggleMute}
               onVolumeChange={handleVolumeChange}
               onReconnect={handleReconnect}
-              onSolo={handleSolo}
             />
           ))}
         </section>

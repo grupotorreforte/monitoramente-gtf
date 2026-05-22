@@ -1,6 +1,4 @@
-import { useEffect, useRef } from 'react'
-import { Music2, Play, RefreshCw, Volume2, VolumeX } from 'lucide-react'
-import WaveSurfer from 'wavesurfer.js'
+import { Radio, RefreshCw, Volume2, VolumeX } from 'lucide-react'
 import AudioMeterReact from './AudioMeterReact'
 
 function StatusDot({ status, muted }) {
@@ -43,59 +41,43 @@ function Fader({ volume, onVolumeChange }) {
   )
 }
 
-function Waveform({ active, audioElement, peaks }) {
-  const containerRef = useRef(null)
-  const wavesurferRef = useRef(null)
+function Waveform({ active, peaks }) {
+  const safePeaks = peaks?.length ? peaks : new Array(96).fill(0.03)
 
-  useEffect(() => {
-    if (!containerRef.current || !audioElement) return undefined
+  return (
+    <div className={`waveform ${active ? 'is-live' : 'is-down'}`} aria-label="Waveform de áudio em tempo real">
+      {safePeaks.map((peak, index) => (
+        <span
+          key={index}
+          className="waveform-bar"
+          style={{ transform: `scaleY(${Math.max(0.05, Math.min(1, peak))})` }}
+        />
+      ))}
+    </div>
+  )
+}
 
-    const wavesurfer = WaveSurfer.create({
-      container: containerRef.current,
-      media: audioElement,
-      backend: 'MediaElement',
-      waveColor: 'rgba(180, 183, 190, 0.46)',
-      progressColor: 'rgba(185, 204, 255, 0.92)',
-      cursorColor: 'transparent',
-      cursorWidth: 0,
-      barWidth: 3,
-      barGap: 3,
-      barRadius: 2,
-      height: 76,
-      interact: false,
-      normalize: true,
-      peaks: peaks ? [peaks] : undefined,
-      duration: 30
-    })
+function MonitorRow({ label, status, detail }) {
+  const normalizedStatus = status ?? 'idle'
 
-    wavesurferRef.current = wavesurfer
-
-    return () => {
-      wavesurfer.destroy()
-      wavesurferRef.current = null
-    }
-  }, [audioElement])
-
-  useEffect(() => {
-    if (!wavesurferRef.current || !peaks?.length) return
-
-    wavesurferRef.current.setOptions({
-      waveColor: active ? 'rgba(180, 183, 190, 0.48)' : 'rgba(202, 74, 76, 0.4)',
-      progressColor: active ? 'rgba(185, 204, 255, 0.92)' : 'rgba(202, 74, 76, 0.7)',
-      peaks: [peaks],
-      duration: 30
-    })
-  }, [active, peaks])
-
-  return <div ref={containerRef} className={`waveform ${active ? 'is-live' : 'is-down'}`} />
+  return (
+    <div className={`monitor-row monitor-${normalizedStatus}`}>
+      <span className="monitor-label">
+        <Radio size={13} aria-hidden="true" />
+        {label}
+      </span>
+      <strong>{normalizedStatus === 'unconfigured' ? 'Pendente' : normalizedStatus}</strong>
+      <span>{detail}</span>
+    </div>
+  )
 }
 
 export default function StreamCard({
   stream,
   probe,
+  fmProbe,
   nowPlaying,
   audioState,
-  audioElement,
   audioContext,
   sourceNode,
   waveformPeaks,
@@ -103,8 +85,7 @@ export default function StreamCard({
   onMeterLevels,
   onToggleMute,
   onVolumeChange,
-  onReconnect,
-  onSolo
+  onReconnect
 }) {
   const isMetadataOffline = stream.metadataOfflineMeansDown && nowPlaying.title?.trim().toLowerCase() === 'station offline'
   const isOnline = probe.status === 'online' && !isMetadataOffline
@@ -137,7 +118,12 @@ export default function StreamCard({
             <span>{title}</span>
         </div> */}
 
-        <Waveform active={isAudioAnalyzing} audioElement={audioElement} peaks={waveformPeaks} />
+        <Waveform active={isAudioAnalyzing} peaks={waveformPeaks} />
+
+        <div className="monitor-stack">
+          <MonitorRow label="STREAMING" status={probe.status} detail={probe.detail} />
+          <MonitorRow label="FM" status={fmProbe?.status} detail={fmProbe?.detail} />
+        </div>
 
         <footer className="stream-footer">
           <span className={isOffline ? 'state-offline' : 'state-online'}>
@@ -155,10 +141,6 @@ export default function StreamCard({
         <button type="button" className="card-action-button is-mute" onClick={() => onToggleMute(stream.id)}>
           {audioState.isMuted ? <Volume2 size={17} aria-hidden="true" /> : <VolumeX size={17} aria-hidden="true" />}
           {audioState.isMuted ? 'Unmute' : 'Mute'}
-        </button>
-        <button type="button" className="card-action-button" onClick={() => onSolo(stream.id)}>
-          <Play size={17} aria-hidden="true" />
-          Solo
         </button>
       </div>
     </article>

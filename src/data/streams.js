@@ -10,7 +10,9 @@ function buildSoundstream({
   metadataOfflineMeansDown = false,
   streamUrl,
   fallbackUrl,
-  metadataUrl
+  metadataUrl,
+  fmMonitorUrl = null,
+  fmFallbackUrl = null
 }) {
   return {
     id,
@@ -25,12 +27,14 @@ function buildSoundstream({
     publicUrl: `https://${host}/public/${slug}`,
     metadataUrl: metadataUrl === undefined ? `https://${host}/api/nowplaying/${slug}` : metadataUrl,
     fallbackUrl: fallbackUrl === undefined ? `http://${host}:${port}/live` : fallbackUrl,
+    fmMonitorUrl,
+    fmFallbackUrl,
     aliases,
     metadataOfflineMeansDown
   }
 }
 
-function buildSrvstm({ id, name, city, state = 'MG', frequency, streamUrl }) {
+function buildSrvstm({ id, name, city, state = 'MG', frequency, streamUrl, fmMonitorUrl = null, fmFallbackUrl = null }) {
   return {
     id,
     name,
@@ -44,6 +48,8 @@ function buildSrvstm({ id, name, city, state = 'MG', frequency, streamUrl }) {
     publicUrl: streamUrl,
     metadataUrl: null,
     fallbackUrl: null,
+    fmMonitorUrl,
+    fmFallbackUrl,
     aliases: [],
     metadataOfflineMeansDown: false
   }
@@ -56,6 +62,7 @@ export const streams = [
     city: 'Volta Redonda',
     state: 'RJ',
     frequency: '88,7 MHz',
+    // fmMonitorUrl: 'ADICIONE_AQUI_O_LINK_DO_FM',
     streamUrl: 'https://stm39.srvstm.com:9776/stream'
   }),
   buildSrvstm({
@@ -63,6 +70,7 @@ export const streams = [
     name: 'Maravilha FM - SEDE',
     city: 'Belo Horizonte',
     frequency: '89,1 MHz',
+    // fmMonitorUrl: 'ADICIONE_AQUI_O_LINK_DO_FM',
     streamUrl: 'https://stm19.srvstm.com:7080/stream'
   }),
   buildSoundstream({
@@ -73,6 +81,7 @@ export const streams = [
     host: 'srv2.soundstream.com.br',
     slug: 'maravilhafmcambui',
     port: 8040,
+    // fmMonitorUrl: 'ADICIONE_AQUI_O_LINK_DO_FM',
     metadataOfflineMeansDown: true
   }),
   buildSoundstream({
@@ -82,6 +91,7 @@ export const streams = [
     frequency: '89,3 MHz',
     host: 'srv2.soundstream.com.br',
     slug: 'maravilhafmbarbacena',
+    // fmMonitorUrl: 'ADICIONE_AQUI_O_LINK_DO_FM',
     port: 8020
   }),
   buildSoundstream({
@@ -91,6 +101,7 @@ export const streams = [
     frequency: '89,5 FM',
     host: 'srv2.soundstream.com.br',
     slug: 'maravilhafmipatinga',
+    // fmMonitorUrl: 'ADICIONE_AQUI_O_LINK_DO_FM',
     port: 8030
   }),
   buildSoundstream({
@@ -101,6 +112,7 @@ export const streams = [
     host: 'srv.soundstream.com.br',
     slug: 'maravilhafmjf',
     port: 8030,
+    // fmMonitorUrl: 'ADICIONE_AQUI_O_LINK_DO_FM',
     streamUrl: 'https://srv.soundstream.com.br:8030/live',
     fallbackUrl: null,
     metadataUrl: null
@@ -113,6 +125,7 @@ export const streams = [
     host: 'srv.soundstream.com.br',
     slug: 'maravilhafm',
     port: 8180,
+    // fmMonitorUrl: 'ADICIONE_AQUI_O_LINK_DO_FM',
     aliases: ['Rádio Maravilha FM']
   }),
   buildSoundstream({
@@ -122,6 +135,7 @@ export const streams = [
     frequency: '89,7 FM',
     host: 'srv.soundstream.com.br',
     slug: 'maravilhateofilootoni',
+    // fmMonitorUrl: 'ADICIONE_AQUI_O_LINK_DO_FM',
     port: 8240
   }),
   buildSoundstream({
@@ -131,6 +145,7 @@ export const streams = [
     frequency: '97,1 FM',
     host: 'srv.soundstream.com.br',
     slug: 'maravilhacamposgerais',
+    // fmMonitorUrl: 'ADICIONE_AQUI_O_LINK_DO_FM',
     port: 8170
   }),
   buildSoundstream({
@@ -140,6 +155,7 @@ export const streams = [
     frequency: '89,9 FM',
     host: 'srv.soundstream.com.br',
     slug: 'maravilhafmuba',
+    // fmMonitorUrl: 'ADICIONE_AQUI_O_LINK_DO_FM',
     port: 8040
   }),
   buildSoundstream({
@@ -149,6 +165,7 @@ export const streams = [
     frequency: '89,5 FM',
     host: 'srv.soundstream.com.br',
     slug: 'maravilhafmmontesclaros',
+    // fmMonitorUrl: 'ADICIONE_AQUI_O_LINK_DO_FM',
     port: 8020
   }),
   buildSrvstm({
@@ -156,6 +173,7 @@ export const streams = [
     name: 'Maravilha FM Uberlândia',
     city: 'Uberlândia',
     frequency: '89,7 FM',
+    // fmMonitorUrl: 'ADICIONE_AQUI_O_LINK_DO_FM',
     streamUrl: 'https://stm6.srvstm.com:7076/stream'
   }),
   buildSrvstm({
@@ -163,6 +181,7 @@ export const streams = [
     name: 'Maravilha FM Uberaba',
     city: 'Uberaba',
     frequency: '89,3 FM',
+    // fmMonitorUrl: 'ADICIONE_AQUI_O_LINK_DO_FM',
     streamUrl: 'https://stm6.srvstm.com:7006/stream'
   }),
   buildSoundstream({
@@ -172,6 +191,7 @@ export const streams = [
     frequency: '89,1 FM',
     host: 'srv.soundstream.com.br',
     slug: 'maravilhafmleopoldina',
+    // fmMonitorUrl: 'ADICIONE_AQUI_O_LINK_DO_FM',
     port: 8270
   }),
   buildSoundstream({
@@ -181,6 +201,7 @@ export const streams = [
     frequency: '89,9 FM',
     host: 'srv.soundstream.com.br',
     slug: 'maravilhafmaraxa',
+    // fmMonitorUrl: 'ADICIONE_AQUI_O_LINK_DO_FM',
     port: 8290
   })
 ]

@@ -17,6 +17,8 @@ import { watchStreams } from './lib/watchStream'
 
 const METADATA_REFRESH_MS = 60000
 const WAVEFORM_LEVEL_UPDATE_MS = 90
+const STREAM_CHANNEL = 'stream'
+const FM_CHANNEL = 'fm'
 
 function createProbeState() {
   return Object.fromEntries(
@@ -63,6 +65,19 @@ function createAudioState() {
   )
 }
 
+function createFmAudioState() {
+  return Object.fromEntries(
+    streams.map((stream) => [
+      stream.id,
+      {
+        isPlaying: false,
+        isMuted: true,
+        volume: 1
+      }
+    ])
+  )
+}
+
 function getStreamLabel(stream) {
   return `${stream.name} · ${stream.city} - ${stream.state}`
 }
@@ -84,8 +99,31 @@ function buildPlaybackUrl(stream, cacheBust = Date.now()) {
   return apiUrl(`/api/audio?${params.toString()}`)
 }
 
+function buildFmPlaybackUrl(stream, cacheBust = Date.now()) {
+  if (!stream.fmMonitorUrl) return null
+
+  const params = new URLSearchParams({
+    url: stream.fmMonitorUrl,
+    _: String(cacheBust)
+  })
+
+  if (stream.fmFallbackUrl) {
+    params.set('fallbackUrl', stream.fmFallbackUrl)
+  }
+
+  return apiUrl(`/api/audio?${params.toString()}`)
+}
+
 function getDirectPlaybackUrl(stream) {
   return stream.streamUrl
+}
+
+function getDirectFmPlaybackUrl(stream) {
+  return stream.fmMonitorUrl
+}
+
+function getAudioKey(streamId, channel = STREAM_CHANNEL) {
+  return channel === FM_CHANNEL ? `${streamId}:fm` : streamId
 }
 
 export default function App() {
@@ -99,9 +137,15 @@ export default function App() {
   const [fmProbeStates, setFmProbeStates] = useState(createFmProbeState)
   const [nowPlayingStates, setNowPlayingStates] = useState(createNowPlayingState)
   const [audioStates, setAudioStates] = useState(createAudioState)
+  const [fmAudioStates, setFmAudioStates] = useState(createFmAudioState)
   const [meterNodes, setMeterNodes] = useState({})
   const [waveformPeaks, setWaveformPeaks] = useState(() =>
-    Object.fromEntries(streams.map((stream) => [stream.id, new Array(96).fill(0.03)]))
+    Object.fromEntries(
+      streams.flatMap((stream) => [
+        [getAudioKey(stream.id, STREAM_CHANNEL), new Array(96).fill(0.03)],
+        [getAudioKey(stream.id, FM_CHANNEL), new Array(96).fill(0.03)]
+      ])
+    )
   )
   const [isMonitoring, setIsMonitoring] = useState(false)
   const [alerts, setAlerts] = useState([])
@@ -150,23 +194,47 @@ export default function App() {
 
       audio.addEventListener('error', handlePlaybackError)
       audioRefs.current[stream.id] = audio
+
+      if (stream.fmMonitorUrl) {
+        const fmAudio = new Audio(buildFmPlaybackUrl(stream))
+        const fmAudioKey = getAudioKey(stream.id, FM_CHANNEL)
+        fmAudio.preload = 'none'
+        fmAudio.crossOrigin = 'anonymous'
+        fmAudio.dataset.playbackMode = 'proxy'
+
+        const handleFmPlaybackError = () => {
+          if (fmAudio.dataset.playbackMode !== 'proxy' || !stream.fmMonitorUrl) return
+
+          fmAudio.dataset.playbackMode = 'direct'
+          fmAudio.src = getDirectFmPlaybackUrl(stream)
+          fmAudio.load()
+        }
+
+        fmAudio.addEventListener('error', handleFmPlaybackError)
+        audioRefs.current[fmAudioKey] = fmAudio
+      }
     })
 
     return () => {
       streams.forEach((stream) => {
-        const audio = audioRefs.current[stream.id]
-        if (!audio) return
+        const streamKeys = [stream.id, getAudioKey(stream.id, FM_CHANNEL)]
 
-        audio.pause()
-        audio.removeAttribute('data-playback-mode')
-        audio.removeAttribute('src')
-        audio.load()
+        streamKeys.forEach((audioKey) => {
+          const audio = audioRefs.current[audioKey]
+          if (!audio) return
+
+          audio.pause()
+          audio.removeAttribute('data-playback-mode')
+          audio.removeAttribute('src')
+          audio.load()
+        })
       })
     }
   }, [])
 
-  const ensureAudioGraph = (streamId) => {
-    const audio = audioRefs.current[streamId]
+  const ensureAudioGraph = (streamId, channel = STREAM_CHANNEL, audioState = audioStates[streamId]) => {
+    const audioKey = getAudioKey(streamId, channel)
+    const audio = audioRefs.current[audioKey]
     if (!audio) return null
 
     const AudioContextConstructor = window.AudioContext || window.webkitAudioContext
@@ -180,55 +248,57 @@ export default function App() {
       audioContextRef.current.resume().catch(() => {})
     }
 
-    if (!sourceNodesRef.current[streamId]) {
+    if (!sourceNodesRef.current[audioKey]) {
       const sourceNode = audioContextRef.current.createMediaElementSource(audio)
       const gainNode = audioContextRef.current.createGain()
-      const currentAudioState = audioStates[streamId]
 
       audio.muted = false
       audio.volume = 1
-      gainNode.gain.value = getEffectiveMute(streamId, currentAudioState) ? 0 : currentAudioState?.volume ?? 1
+      gainNode.gain.value = getEffectiveMute(streamId, audioState) ? 0 : audioState?.volume ?? 1
       sourceNode.connect(gainNode)
       gainNode.connect(audioContextRef.current.destination)
 
-      sourceNodesRef.current[streamId] = sourceNode
-      gainNodesRef.current[streamId] = gainNode
+      sourceNodesRef.current[audioKey] = sourceNode
+      gainNodesRef.current[audioKey] = gainNode
 
       setMeterNodes((state) => ({
         ...state,
-        [streamId]: {
+        [audioKey]: {
           audioContext: audioContextRef.current,
           sourceNode
         }
       }))
     }
 
-    return sourceNodesRef.current[streamId]
+    return sourceNodesRef.current[audioKey]
   }
 
-  const setOutputGain = (streamId, volume, isMuted) => {
+  const setOutputGain = (streamId, volume, isMuted, channel = STREAM_CHANNEL) => {
+    const audioKey = getAudioKey(streamId, channel)
     const audioContext = audioContextRef.current
-    const gainNode = gainNodesRef.current[streamId]
+    const gainNode = gainNodesRef.current[audioKey]
 
     if (!gainNode || !audioContext) return
 
     gainNode.gain.setTargetAtTime(isMuted ? 0 : volume, audioContext.currentTime, 0.015)
   }
 
-  const prepareAudio = (stream) => {
-    const audio = audioRefs.current[stream.id]
+  const prepareAudio = (stream, channel = STREAM_CHANNEL, audioState = audioStates[stream.id]) => {
+    const audioKey = getAudioKey(stream.id, channel)
+    const audio = audioRefs.current[audioKey]
     if (!audio) return false
 
     try {
-      ensureAudioGraph(stream.id)
+      ensureAudioGraph(stream.id, channel, audioState)
       return true
     } catch {
       return false
     }
   }
 
-  const playPreparedAudio = async (stream) => {
-    const audio = audioRefs.current[stream.id]
+  const playPreparedAudio = async (stream, channel = STREAM_CHANNEL) => {
+    const audioKey = getAudioKey(stream.id, channel)
+    const audio = audioRefs.current[audioKey]
     if (!audio) return false
 
     try {
@@ -236,8 +306,11 @@ export default function App() {
       return true
     } catch {
       if (audio.dataset.playbackMode === 'proxy') {
+        const directUrl = channel === FM_CHANNEL ? getDirectFmPlaybackUrl(stream) : getDirectPlaybackUrl(stream)
+        if (!directUrl) return false
+
         audio.dataset.playbackMode = 'direct'
-        audio.src = getDirectPlaybackUrl(stream)
+        audio.src = directUrl
         audio.load()
 
         try {
@@ -252,10 +325,13 @@ export default function App() {
     }
   }
 
-  const startStreams = async (streamsToStart) => {
-    const preparedStreams = streamsToStart.filter((stream) => prepareAudio(stream))
+  const startStreams = async (streamsToStart, channel = STREAM_CHANNEL, state = audioStates) => {
+    const playableStreams = channel === FM_CHANNEL
+      ? streamsToStart.filter((stream) => stream.fmMonitorUrl)
+      : streamsToStart
+    const preparedStreams = playableStreams.filter((stream) => prepareAudio(stream, channel, state[stream.id]))
 
-    const results = await Promise.allSettled(preparedStreams.map((stream) => playPreparedAudio(stream)))
+    const results = await Promise.allSettled(preparedStreams.map((stream) => playPreparedAudio(stream, channel)))
     const playedStreamIds = []
 
     results.forEach((result, index) => {
@@ -268,13 +344,26 @@ export default function App() {
   }
 
   useEffect(() => {
-    Object.entries(audioRefs.current).forEach(([streamId, audio]) => {
+    Object.entries(audioRefs.current).forEach(([audioKey, audio]) => {
+      const streamId = audioKey.replace(/:fm$/, '')
       if (selectedIdSet.has(streamId)) return
 
       audio.pause()
     })
 
     setAudioStates((state) =>
+      Object.fromEntries(
+        Object.entries(state).map(([streamId, value]) => [
+          streamId,
+          {
+            ...value,
+            isPlaying: selectedIdSet.has(streamId) ? value.isPlaying : false
+          }
+        ])
+      )
+    )
+
+    setFmAudioStates((state) =>
       Object.fromEntries(
         Object.entries(state).map(([streamId, value]) => [
           streamId,
@@ -446,6 +535,25 @@ export default function App() {
     }))
   }
 
+  const handleToggleFmMute = (streamId) => {
+    const audioKey = getAudioKey(streamId, FM_CHANNEL)
+    const audio = audioRefs.current[audioKey]
+    if (!audio) return
+
+    const nextMuted = !fmAudioStates[streamId]?.isMuted
+    audio.muted = false
+    audio.volume = 1
+    setOutputGain(streamId, fmAudioStates[streamId]?.volume ?? 1, getEffectiveMute(streamId, { ...fmAudioStates[streamId], isMuted: nextMuted }), FM_CHANNEL)
+
+    setFmAudioStates((state) => ({
+      ...state,
+      [streamId]: {
+        ...state[streamId],
+        isMuted: nextMuted
+      }
+    }))
+  }
+
   const handleVolumeChange = (streamId, nextVolume) => {
     const audio = audioRefs.current[streamId]
     if (audio) {
@@ -456,6 +564,26 @@ export default function App() {
     setOutputGain(streamId, nextVolume, getEffectiveMute(streamId, { ...audioStates[streamId], volume: nextVolume, isMuted: nextVolume === 0 }))
 
     setAudioStates((state) => ({
+      ...state,
+      [streamId]: {
+        ...state[streamId],
+        volume: nextVolume,
+        isMuted: nextVolume === 0 ? true : state[streamId].isMuted && nextVolume === 0
+      }
+    }))
+  }
+
+  const handleFmVolumeChange = (streamId, nextVolume) => {
+    const audioKey = getAudioKey(streamId, FM_CHANNEL)
+    const audio = audioRefs.current[audioKey]
+    if (audio) {
+      audio.volume = 1
+      audio.muted = false
+    }
+
+    setOutputGain(streamId, nextVolume, getEffectiveMute(streamId, { ...fmAudioStates[streamId], volume: nextVolume, isMuted: nextVolume === 0 }), FM_CHANNEL)
+
+    setFmAudioStates((state) => ({
       ...state,
       [streamId]: {
         ...state[streamId],
@@ -494,11 +622,46 @@ export default function App() {
     }))
   }
 
+  const handleFmReconnect = async (streamId) => {
+    const audioKey = getAudioKey(streamId, FM_CHANNEL)
+    const audio = audioRefs.current[audioKey]
+    if (!audio) return
+
+    const stream = streams.find((item) => item.id === streamId)
+    if (!stream?.fmMonitorUrl) return
+
+    audio.pause()
+    audio.dataset.playbackMode = 'proxy'
+    audio.src = buildFmPlaybackUrl(stream)
+    audio.load()
+
+    setFmProbeStates((state) => ({
+      ...state,
+      [streamId]: {
+        ...state[streamId],
+        status: 'checking',
+        detail: 'Reconectando FM...'
+      }
+    }))
+
+    const playedStreamIds = await startStreams([stream], FM_CHANNEL, fmAudioStates)
+
+    setFmAudioStates((state) => ({
+      ...state,
+      [streamId]: {
+        ...state[streamId],
+        isPlaying: playedStreamIds.includes(streamId)
+      }
+    }))
+  }
+
   const handleStartMonitoring = async () => {
     setHasStartedAudioMonitoring(true)
 
     const playedStreamIds = await startStreams(monitoredStreams)
+    const playedFmStreamIds = await startStreams(monitoredStreams, FM_CHANNEL, fmAudioStates)
     const playedIdSet = new Set(playedStreamIds)
+    const playedFmIdSet = new Set(playedFmStreamIds)
 
     setAudioStates((state) => ({
       ...state,
@@ -508,6 +671,19 @@ export default function App() {
           {
             ...state[stream.id],
             isPlaying: playedIdSet.has(stream.id)
+          }
+        ])
+      )
+    }))
+
+    setFmAudioStates((state) => ({
+      ...state,
+      ...Object.fromEntries(
+        monitoredStreams.map((stream) => [
+          stream.id,
+          {
+            ...state[stream.id],
+            isPlaying: playedFmIdSet.has(stream.id)
           }
         ])
       )
@@ -522,9 +698,30 @@ export default function App() {
         audio.muted = false
       }
       setOutputGain(stream.id, audioStates[stream.id]?.volume ?? 1, true)
+
+      const fmAudioKey = getAudioKey(stream.id, FM_CHANNEL)
+      const fmAudio = audioRefs.current[fmAudioKey]
+      if (fmAudio) {
+        fmAudio.volume = 1
+        fmAudio.muted = false
+      }
+      setOutputGain(stream.id, fmAudioStates[stream.id]?.volume ?? 1, true, FM_CHANNEL)
     })
 
     setAudioStates((state) => ({
+      ...state,
+      ...Object.fromEntries(
+        monitoredStreams.map((stream) => [
+          stream.id,
+          {
+            ...state[stream.id],
+            isMuted: true
+          }
+        ])
+      )
+    }))
+
+    setFmAudioStates((state) => ({
       ...state,
       ...Object.fromEntries(
         monitoredStreams.map((stream) => [
@@ -541,6 +738,9 @@ export default function App() {
   const handleReconnectAll = async () => {
     for (const stream of monitoredStreams) {
       await handleReconnect(stream.id)
+      if (stream.fmMonitorUrl) {
+        await handleFmReconnect(stream.id)
+      }
     }
   }
 
@@ -575,25 +775,33 @@ export default function App() {
     setColumns((current) => (current === 4 ? 1 : current + 1))
   }
 
-  const handleMeterLevels = useCallback((streamId, levels) => {
+  const handleMeterLevelsForKey = useCallback((waveformKey, levels) => {
     const [left = 0, right = 0] = levels ?? []
     const nextPeak = Math.max(0.03, Math.min(1, ((left + right) / 2) * 8))
     const now = performance.now()
 
-    if (now - (lastWaveformUpdateRef.current[streamId] ?? 0) < WAVEFORM_LEVEL_UPDATE_MS) {
+    if (now - (lastWaveformUpdateRef.current[waveformKey] ?? 0) < WAVEFORM_LEVEL_UPDATE_MS) {
       return
     }
 
-    lastWaveformUpdateRef.current[streamId] = now
+    lastWaveformUpdateRef.current[waveformKey] = now
 
     setWaveformPeaks((state) => {
-      const current = state[streamId] ?? new Array(96).fill(0.03)
+      const current = state[waveformKey] ?? new Array(96).fill(0.03)
       return {
         ...state,
-        [streamId]: [...current.slice(1), nextPeak]
+        [waveformKey]: [...current.slice(1), nextPeak]
       }
     })
   }, [])
+
+  const handleMeterLevels = useCallback((streamId, levels) => {
+    handleMeterLevelsForKey(getAudioKey(streamId, STREAM_CHANNEL), levels)
+  }, [handleMeterLevelsForKey])
+
+  const handleFmMeterLevels = useCallback((streamId, levels) => {
+    handleMeterLevelsForKey(getAudioKey(streamId, FM_CHANNEL), levels)
+  }, [handleMeterLevelsForKey])
 
   return (
     <main className="app-shell">
@@ -733,14 +941,22 @@ export default function App() {
               fmProbe={fmProbeStates[stream.id]}
               nowPlaying={nowPlayingStates[stream.id]}
               audioState={audioStates[stream.id]}
-              audioContext={meterNodes[stream.id]?.audioContext ?? null}
-              sourceNode={meterNodes[stream.id]?.sourceNode ?? null}
-              waveformPeaks={waveformPeaks[stream.id]}
+              fmAudioState={fmAudioStates[stream.id]}
+              audioContext={meterNodes[getAudioKey(stream.id, STREAM_CHANNEL)]?.audioContext ?? null}
+              sourceNode={meterNodes[getAudioKey(stream.id, STREAM_CHANNEL)]?.sourceNode ?? null}
+              fmAudioContext={meterNodes[getAudioKey(stream.id, FM_CHANNEL)]?.audioContext ?? null}
+              fmSourceNode={meterNodes[getAudioKey(stream.id, FM_CHANNEL)]?.sourceNode ?? null}
+              waveformPeaks={waveformPeaks[getAudioKey(stream.id, STREAM_CHANNEL)]}
+              fmWaveformPeaks={waveformPeaks[getAudioKey(stream.id, FM_CHANNEL)]}
               isMeterActive={hasStartedAudioMonitoring}
               onMeterLevels={handleMeterLevels}
+              onFmMeterLevels={handleFmMeterLevels}
               onToggleMute={handleToggleMute}
+              onToggleFmMute={handleToggleFmMute}
               onVolumeChange={handleVolumeChange}
+              onFmVolumeChange={handleFmVolumeChange}
               onReconnect={handleReconnect}
+              onFmReconnect={handleFmReconnect}
             />
           ))}
         </section>

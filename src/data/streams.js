@@ -191,7 +191,8 @@ export const streams = [
     frequency: '89,1 FM',
     host: 'srv.soundstream.com.br',
     slug: 'maravilhafmleopoldina',
-    // fmMonitorUrl: 'ADICIONE_AQUI_O_LINK_DO_FM',
+    fmMonitorUrl: 'http://192.168.70.253:8870/radiofm_leopoldina',
+    fmFallbackUrl: 'http://streaming.grupogtf.com.br:8870/radiofm_leopoldina',
     port: 8270
   }),
   buildSoundstream({

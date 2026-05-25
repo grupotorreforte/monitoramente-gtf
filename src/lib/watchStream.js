@@ -8,23 +8,46 @@ export function watchStream({ streamUrl, fallbackUrl, onStatus, onError }) {
   }
 
   const eventSource = new EventSource(apiUrl(`/api/watch?${params.toString()}`))
+  let reconnectNoticeTimer = null
+  let closed = false
+
+  const clearReconnectNotice = () => {
+    if (reconnectNoticeTimer) {
+      window.clearTimeout(reconnectNoticeTimer)
+      reconnectNoticeTimer = null
+    }
+  }
 
   eventSource.addEventListener('status', (event) => {
+    clearReconnectNotice()
     onStatus(JSON.parse(event.data))
   })
 
+  eventSource.addEventListener('open', clearReconnectNotice)
+
   eventSource.onerror = () => {
-    onError?.({
-      status: 'checking',
-      detail: 'Reconectando com a API de monitoramento.',
-      checkedAt: new Date().toISOString(),
-      latencyMs: null,
-      receivedBytes: 0,
-      httpStatus: null,
-      contentType: null
-    })
+    if (closed || reconnectNoticeTimer) return
+
+    reconnectNoticeTimer = window.setTimeout(() => {
+      if (closed || eventSource.readyState === EventSource.OPEN) return
+
+      onError?.({
+        status: 'checking',
+        detail: 'Reconectando com a API de monitoramento.',
+        checkedAt: new Date().toISOString(),
+        latencyMs: null,
+        receivedBytes: 0,
+        httpStatus: null,
+        contentType: null
+      })
+      reconnectNoticeTimer = null
+    }, 3000)
   }
-  return () => eventSource.close()
+  return () => {
+    closed = true
+    clearReconnectNotice()
+    eventSource.close()
+  }
 }
 
 export function watchStreams({ streams, onStatus, onError }) {

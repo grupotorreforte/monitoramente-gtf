@@ -2,7 +2,15 @@ const DEFAULT_TIMEOUT_MS = 9000
 const MAX_BYTES = 32768
 const STREAM_LEVEL_EMIT_MS = 650
 const STREAM_STALL_TIMEOUT_MS = 12000
+const STREAM_RETRY_DELAY_MS = 2500
+const STREAM_OFFLINE_AFTER_FAILURES = 3
 const WATCH_MAX_RUNTIME_MS = 25000
+
+function wait(ms) {
+  return new Promise((resolve) => {
+    setTimeout(resolve, ms)
+  })
+}
 
 export function setCors(res, contentType = 'application/json; charset=utf-8') {
   res.setHeader('Access-Control-Allow-Origin', '*')
@@ -179,90 +187,105 @@ export function sendSse(res, event, payload) {
 export async function monitorStreamForSse({ id, url, fallbackUrl, res, shouldStop }) {
   const attempts = [url, fallbackUrl].filter(Boolean)
   let lastError = null
+  let consecutiveFailures = 0
 
-  for (const attemptUrl of attempts) {
-    if (shouldStop()) return
+  if (attempts.length === 0) return
 
-    const controller = new AbortController()
-    const startedAt = performance.now()
-    let stallTimer = null
-    let lastLevelEmitAt = 0
-    let receivedBytes = 0
+  while (!shouldStop()) {
+    for (const attemptUrl of attempts) {
+      if (shouldStop()) return
 
-    const resetStallTimer = () => {
-      clearTimeout(stallTimer)
-      stallTimer = setTimeout(() => controller.abort(), STREAM_STALL_TIMEOUT_MS)
-    }
+      const controller = new AbortController()
+      const startedAt = performance.now()
+      let stallTimer = null
+      let lastLevelEmitAt = 0
+      let receivedBytes = 0
 
-    try {
-      resetStallTimer()
-
-      const response = await fetch(attemptUrl, {
-        headers: {
-          'Icy-MetaData': '1',
-          'User-Agent': 'ServicoMonitoramento/0.1'
-        },
-        redirect: 'follow',
-        signal: controller.signal
-      })
-
-      if (response.status >= 400) {
-        throw new Error(`HTTP ${response.status}`)
+      const resetStallTimer = () => {
+        clearTimeout(stallTimer)
+        stallTimer = setTimeout(() => controller.abort(), STREAM_STALL_TIMEOUT_MS)
       }
 
-      if (!response.body) {
-        throw new Error('Stream sem corpo de resposta')
-      }
-
-      const reader = response.body.getReader()
-
-      while (!shouldStop()) {
+      try {
         resetStallTimer()
-        const { done, value } = await reader.read()
 
-        if (done) {
-          throw new Error('Stream encerrado pelo servidor')
+        const response = await fetch(attemptUrl, {
+          headers: {
+            'Icy-MetaData': '1',
+            'User-Agent': 'ServicoMonitoramento/0.1'
+          },
+          redirect: 'follow',
+          signal: controller.signal
+        })
+
+        if (response.status >= 400) {
+          throw new Error(`HTTP ${response.status}`)
         }
 
-        receivedBytes += value?.byteLength ?? 0
-        const now = performance.now()
-
-        if (now - lastLevelEmitAt >= STREAM_LEVEL_EMIT_MS) {
-          lastLevelEmitAt = now
-          sendSse(res, 'status', {
-            id,
-            status: 'online',
-            detail: 'Stream online com leitura contínua.',
-            checkedAt: new Date().toISOString(),
-            latencyMs: Math.round(performance.now() - startedAt),
-            receivedBytes,
-            httpStatus: response.status,
-            contentType: response.headers.get('content-type')
-          })
+        if (!response.body) {
+          throw new Error('Stream sem corpo de resposta')
         }
+
+        const reader = response.body.getReader()
+        consecutiveFailures = 0
+
+        while (!shouldStop()) {
+          resetStallTimer()
+          const { done, value } = await reader.read()
+
+          if (done) {
+            throw new Error('Stream encerrado pelo servidor')
+          }
+
+          receivedBytes += value?.byteLength ?? 0
+          const now = performance.now()
+
+          if (now - lastLevelEmitAt >= STREAM_LEVEL_EMIT_MS) {
+            lastLevelEmitAt = now
+            sendSse(res, 'status', {
+              id,
+              status: 'online',
+              detail: 'Stream online com leitura contínua.',
+              checkedAt: new Date().toISOString(),
+              latencyMs: Math.round(performance.now() - startedAt),
+              receivedBytes,
+              httpStatus: response.status,
+              contentType: response.headers.get('content-type')
+            })
+          }
+        }
+
+        await reader.cancel().catch(() => {})
+        return
+      } catch (error) {
+        lastError = error
+      } finally {
+        clearTimeout(stallTimer)
+        controller.abort()
       }
-
-      await reader.cancel().catch(() => {})
-      return
-    } catch (error) {
-      lastError = error
-    } finally {
-      clearTimeout(stallTimer)
-      controller.abort()
     }
-  }
 
-  if (!shouldStop()) {
-    sendSse(res, 'status', {
-      id,
-      status: lastError?.name === 'AbortError' ? 'timeout' : 'offline',
-      detail: lastError?.name === 'AbortError' ? 'Stream sem bytes por tempo prolongado.' : `Falha no stream: ${lastError?.message ?? 'erro desconhecido'}.`,
-      checkedAt: new Date().toISOString(),
-      latencyMs: null,
-      receivedBytes: 0,
-      httpStatus: null,
-      contentType: null
-    })
+    consecutiveFailures += 1
+
+    if (!shouldStop()) {
+      const isOffline = consecutiveFailures >= STREAM_OFFLINE_AFTER_FAILURES
+      const isTimeout = lastError?.name === 'AbortError'
+
+      sendSse(res, 'status', {
+        id,
+        status: isOffline ? isTimeout ? 'timeout' : 'offline' : 'checking',
+        detail: isOffline
+          ? isTimeout ? 'Stream sem bytes por tempo prolongado.' : `Falha no stream: ${lastError?.message ?? 'erro desconhecido'}.`
+          : 'Nova tentativa de conexão com o stream em andamento.',
+        checkedAt: new Date().toISOString(),
+        latencyMs: null,
+        receivedBytes: 0,
+        httpStatus: null,
+        contentType: null
+      })
+    }
+
+    await wait(STREAM_RETRY_DELAY_MS)
   }
 }
 

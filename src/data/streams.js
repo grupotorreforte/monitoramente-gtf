@@ -101,6 +101,7 @@ export const streams = [
     frequency: '89,5 FM',
     host: 'srv2.soundstream.com.br',
     slug: 'maravilhafmipatinga',
+    streamUrl: 'https://srv2.soundstream.com.br/listen/maravilhafmipatinga/live',
     fmMonitorUrl: 'http://192.168.70.253:8870/radiofm_ipatinga',
     port: 8030
   }),
@@ -125,6 +126,7 @@ export const streams = [
     host: 'srv.soundstream.com.br',
     slug: 'maravilhafm',
     port: 8180,
+    streamUrl: 'https://srv.soundstream.com.br/listen/maravilhafm/live',
     // fmMonitorUrl: 'ADICIONE_AQUI_O_LINK_DO_FM',
     aliases: ['Rádio Maravilha FM']
   }),
@@ -135,8 +137,9 @@ export const streams = [
     frequency: '89,7 FM',
     host: 'srv.soundstream.com.br',
     slug: 'maravilhateofilootoni',
+    streamUrl: 'https://srv.soundstream.com.br/listen/maravilhateofilootoni/live',
     fmMonitorUrl: 'http://192.168.70.253:8870/radiofm_teofilootoni',
-    fmFallbackUrl: 'http://streaming.grupogtf.com.br:8870/radiofm_teofilootoni',
+    /* fmFallbackUrl: 'http://streaming.grupogtf.com.br:8870/radiofm_teofilootoni', */
     port: 8240
   }),
   buildSoundstream({
@@ -146,6 +149,7 @@ export const streams = [
     frequency: '97,1 FM',
     host: 'srv.soundstream.com.br',
     slug: 'maravilhacamposgerais',
+    streamUrl: 'https://srv.soundstream.com.br/listen/maravilhacamposgerais/live',
     // fmMonitorUrl: 'ADICIONE_AQUI_O_LINK_DO_FM',
     port: 8170
   }),
@@ -156,6 +160,7 @@ export const streams = [
     frequency: '89,9 FM',
     host: 'srv.soundstream.com.br',
     slug: 'maravilhafmuba',
+    streamUrl: 'https://srv.soundstream.com.br/listen/maravilhafmuba/live',
     fmMonitorUrl: 'http://192.168.70.253:8870/radiofm_uba',
     fmFallbackUrl: 'http://streaming.grupogtf.com.br:8870/radiofm_uba',
     port: 8040
@@ -194,6 +199,7 @@ export const streams = [
     frequency: '89,1 FM',
     host: 'srv.soundstream.com.br',
     slug: 'maravilhafmleopoldina',
+    streamUrl: 'https://srv.soundstream.com.br/listen/maravilhafmleopoldina/live',
     fmMonitorUrl: 'http://192.168.70.253:8870/radiofm_leopoldina',
     //fmFallbackUrl: 'http://streaming.grupogtf.com.br:8870/radiofm_leopoldina',
     port: 8270
@@ -205,6 +211,7 @@ export const streams = [
     frequency: '89,9 FM',
     host: 'srv.soundstream.com.br',
     slug: 'maravilhafmaraxa',
+    streamUrl: 'https://srv.soundstream.com.br/listen/maravilhafmaraxa/live',
     fmMonitorUrl: 'http://192.168.70.253:8870/radiofm_araxa',
     port: 8290
   })

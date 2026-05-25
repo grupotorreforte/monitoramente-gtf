@@ -17,8 +17,32 @@ import { watchStreams } from './lib/watchStream'
 
 const METADATA_REFRESH_MS = 60000
 const WAVEFORM_LEVEL_UPDATE_MS = 90
+const AUDIO_PLAY_RETRY_COUNT = 3
+const AUDIO_PLAY_RETRY_DELAY_MS = 450
+const AUDIO_AUTO_RECONNECT_DELAY_MS = 1200
+const AUDIO_START_BATCH_SIZE = 4
+const AUDIO_START_RECOVERY_ATTEMPTS = 4
+const AUDIO_START_RECOVERY_DELAY_MS = 1800
 const STREAM_CHANNEL = 'stream'
 const FM_CHANNEL = 'fm'
+
+function wait(ms) {
+  return new Promise((resolve) => {
+    window.setTimeout(resolve, ms)
+  })
+}
+
+async function runInBatches(items, batchSize, worker) {
+  const results = []
+
+  for (let index = 0; index < items.length; index += batchSize) {
+    const batch = items.slice(index, index + batchSize)
+    const batchResults = await Promise.allSettled(batch.map(worker))
+    results.push(...batchResults)
+  }
+
+  return results
+}
 
 function createProbeState() {
   return Object.fromEntries(
@@ -133,6 +157,12 @@ export default function App() {
   const gainNodesRef = useRef({})
   const previousStatusesRef = useRef({})
   const lastWaveformUpdateRef = useRef({})
+  const reconnectTimersRef = useRef({})
+  const audioStatesRef = useRef({})
+  const fmAudioStatesRef = useRef({})
+  const selectedIdSetRef = useRef(new Set(allStreamIds))
+  const isAudioMonitoringActiveRef = useRef(false)
+  const startSequenceRef = useRef(0)
   const [probeStates, setProbeStates] = useState(createProbeState)
   const [fmProbeStates, setFmProbeStates] = useState(createFmProbeState)
   const [nowPlayingStates, setNowPlayingStates] = useState(createNowPlayingState)
@@ -154,6 +184,7 @@ export default function App() {
   const [singleStreamId, setSingleStreamId] = useState(allStreamIds[0])
   const [isFilterOpen, setIsFilterOpen] = useState(false)
   const [hasStartedAudioMonitoring, setHasStartedAudioMonitoring] = useState(false)
+  const [isStartingAudioMonitoring, setIsStartingAudioMonitoring] = useState(false)
 
   const selectedIdSet = useMemo(() => new Set(selectedStreamIds), [selectedStreamIds])
   const monitoredStreams = useMemo(
@@ -178,21 +209,34 @@ export default function App() {
     Boolean(audioState?.isMuted)
 
   useEffect(() => {
+    audioStatesRef.current = audioStates
+  }, [audioStates])
+
+  useEffect(() => {
+    fmAudioStatesRef.current = fmAudioStates
+  }, [fmAudioStates])
+
+  useEffect(() => {
+    selectedIdSetRef.current = selectedIdSet
+  }, [selectedIdSet])
+
+  useEffect(() => {
+    isAudioMonitoringActiveRef.current = hasStartedAudioMonitoring
+  }, [hasStartedAudioMonitoring])
+
+  useEffect(() => {
     streams.forEach((stream) => {
       const audio = new Audio(buildPlaybackUrl(stream))
       audio.preload = 'none'
       audio.crossOrigin = 'anonymous'
       audio.dataset.playbackMode = 'proxy'
 
-      const handlePlaybackError = () => {
-        if (audio.dataset.playbackMode !== 'proxy') return
+      const handlePlaybackIssue = () => scheduleAudioReconnect(stream, STREAM_CHANNEL)
+      const handlePlaybackStarted = () => markChannelPlaying(stream.id, STREAM_CHANNEL, true)
 
-        audio.dataset.playbackMode = 'direct'
-        audio.src = getDirectPlaybackUrl(stream)
-        audio.load()
-      }
-
-      audio.addEventListener('error', handlePlaybackError)
+      audio.addEventListener('ended', handlePlaybackIssue)
+      audio.addEventListener('error', handlePlaybackIssue)
+      audio.addEventListener('playing', handlePlaybackStarted)
       audioRefs.current[stream.id] = audio
 
       if (stream.fmMonitorUrl) {
@@ -202,20 +246,22 @@ export default function App() {
         fmAudio.crossOrigin = 'anonymous'
         fmAudio.dataset.playbackMode = 'proxy'
 
-        const handleFmPlaybackError = () => {
-          if (fmAudio.dataset.playbackMode !== 'proxy' || !stream.fmMonitorUrl) return
+        const handleFmPlaybackIssue = () => scheduleAudioReconnect(stream, FM_CHANNEL)
+        const handleFmPlaybackStarted = () => markChannelPlaying(stream.id, FM_CHANNEL, true)
 
-          fmAudio.dataset.playbackMode = 'direct'
-          fmAudio.src = getDirectFmPlaybackUrl(stream)
-          fmAudio.load()
-        }
-
-        fmAudio.addEventListener('error', handleFmPlaybackError)
+        fmAudio.addEventListener('ended', handleFmPlaybackIssue)
+        fmAudio.addEventListener('error', handleFmPlaybackIssue)
+        fmAudio.addEventListener('playing', handleFmPlaybackStarted)
         audioRefs.current[fmAudioKey] = fmAudio
       }
     })
 
     return () => {
+      Object.values(reconnectTimersRef.current).forEach((timerId) => {
+        window.clearTimeout(timerId)
+      })
+      reconnectTimersRef.current = {}
+
       streams.forEach((stream) => {
         const streamKeys = [stream.id, getAudioKey(stream.id, FM_CHANNEL)]
 
@@ -231,6 +277,33 @@ export default function App() {
       })
     }
   }, [])
+
+  const resetAudioSource = (stream, channel = STREAM_CHANNEL) => {
+    const audioKey = getAudioKey(stream.id, channel)
+    const audio = audioRefs.current[audioKey]
+    const playbackUrl = channel === FM_CHANNEL ? buildFmPlaybackUrl(stream) : buildPlaybackUrl(stream)
+
+    if (!audio || !playbackUrl) return false
+
+    audio.pause()
+    audio.dataset.playbackMode = 'proxy'
+    audio.src = playbackUrl
+    audio.load()
+    return true
+  }
+
+  const switchAudioToDirect = (stream, channel = STREAM_CHANNEL) => {
+    const audioKey = getAudioKey(stream.id, channel)
+    const audio = audioRefs.current[audioKey]
+    const directUrl = channel === FM_CHANNEL ? getDirectFmPlaybackUrl(stream) : getDirectPlaybackUrl(stream)
+
+    if (!audio || !directUrl) return false
+
+    audio.dataset.playbackMode = 'direct'
+    audio.src = directUrl
+    audio.load()
+    return true
+  }
 
   const ensureAudioGraph = (streamId, channel = STREAM_CHANNEL, audioState = audioStates[streamId]) => {
     const audioKey = getAudioKey(streamId, channel)
@@ -296,32 +369,111 @@ export default function App() {
     }
   }
 
+  const markChannelPlaying = (streamId, channel = STREAM_CHANNEL, isPlaying) => {
+    const setter = channel === FM_CHANNEL ? setFmAudioStates : setAudioStates
+
+    setter((state) => ({
+      ...state,
+      [streamId]: {
+        ...state[streamId],
+        isPlaying
+      }
+    }))
+  }
+
   const playPreparedAudio = async (stream, channel = STREAM_CHANNEL) => {
     const audioKey = getAudioKey(stream.id, channel)
     const audio = audioRefs.current[audioKey]
     if (!audio) return false
 
-    try {
-      await audio.play()
-      return true
-    } catch {
-      if (audio.dataset.playbackMode === 'proxy') {
-        const directUrl = channel === FM_CHANNEL ? getDirectFmPlaybackUrl(stream) : getDirectPlaybackUrl(stream)
-        if (!directUrl) return false
+    for (let attempt = 0; attempt < AUDIO_PLAY_RETRY_COUNT; attempt += 1) {
+      try {
+        if (attempt > 0) {
+          resetAudioSource(stream, channel)
+          await wait(AUDIO_PLAY_RETRY_DELAY_MS * attempt)
+        }
 
-        audio.dataset.playbackMode = 'direct'
-        audio.src = directUrl
-        audio.load()
-
-        try {
-          await audio.play()
-          return true
-        } catch {
-          return false
+        await audio.play()
+        markChannelPlaying(stream.id, channel, true)
+        return true
+      } catch {
+        if (audio.dataset.playbackMode === 'proxy' && switchAudioToDirect(stream, channel)) {
+          try {
+            await wait(AUDIO_PLAY_RETRY_DELAY_MS)
+            await audio.play()
+            markChannelPlaying(stream.id, channel, true)
+            return true
+          } catch {
+            resetAudioSource(stream, channel)
+          }
         }
       }
+    }
 
-      return false
+    markChannelPlaying(stream.id, channel, false)
+    return false
+  }
+
+  const scheduleAudioReconnect = (stream, channel = STREAM_CHANNEL) => {
+    const audioKey = getAudioKey(stream.id, channel)
+    const audio = audioRefs.current[audioKey]
+
+    if (!audio || !isAudioMonitoringActiveRef.current) return
+    if (reconnectTimersRef.current[audioKey]) return
+
+    markChannelPlaying(stream.id, channel, false)
+
+    reconnectTimersRef.current[audioKey] = window.setTimeout(async () => {
+      delete reconnectTimersRef.current[audioKey]
+
+      const state = channel === FM_CHANNEL ? fmAudioStatesRef.current : audioStatesRef.current
+      if (!selectedIdSetRef.current.has(stream.id) || !isAudioMonitoringActiveRef.current) return
+
+      resetAudioSource(stream, channel)
+      prepareAudio(stream, channel, state[stream.id])
+      await playPreparedAudio(stream, channel)
+    }, AUDIO_AUTO_RECONNECT_DELAY_MS)
+  }
+
+  const reconnectAndPlay = async (stream, channel = STREAM_CHANNEL) => {
+    const state = channel === FM_CHANNEL ? fmAudioStatesRef.current : audioStatesRef.current
+    const audioKey = getAudioKey(stream.id, channel)
+
+    if (reconnectTimersRef.current[audioKey]) {
+      window.clearTimeout(reconnectTimersRef.current[audioKey])
+      delete reconnectTimersRef.current[audioKey]
+    }
+
+    resetAudioSource(stream, channel)
+    prepareAudio(stream, channel, state[stream.id])
+
+    if (!isAudioMonitoringActiveRef.current) return false
+
+    return playPreparedAudio(stream, channel)
+  }
+
+  const isChannelPlaybackActive = (streamId, channel = STREAM_CHANNEL) => {
+    const audio = audioRefs.current[getAudioKey(streamId, channel)]
+    return Boolean(audio && !audio.paused && !audio.ended)
+  }
+
+  const recoverMissingStartedStreams = async (streamsToRecover, channel = STREAM_CHANNEL, sequence) => {
+    const playableStreams = channel === FM_CHANNEL
+      ? streamsToRecover.filter((stream) => stream.fmMonitorUrl)
+      : streamsToRecover
+
+    for (let attempt = 0; attempt < AUDIO_START_RECOVERY_ATTEMPTS; attempt += 1) {
+      await wait(AUDIO_START_RECOVERY_DELAY_MS)
+
+      if (startSequenceRef.current !== sequence || !isAudioMonitoringActiveRef.current) return
+
+      const missingStreams = playableStreams.filter((stream) =>
+        selectedIdSetRef.current.has(stream.id) && !isChannelPlaybackActive(stream.id, channel)
+      )
+
+      if (missingStreams.length === 0) return
+
+      await runInBatches(missingStreams, AUDIO_START_BATCH_SIZE, (stream) => reconnectAndPlay(stream, channel))
     }
   }
 
@@ -331,7 +483,7 @@ export default function App() {
       : streamsToStart
     const preparedStreams = playableStreams.filter((stream) => prepareAudio(stream, channel, state[stream.id]))
 
-    const results = await Promise.allSettled(preparedStreams.map((stream) => playPreparedAudio(stream, channel)))
+    const results = await runInBatches(preparedStreams, AUDIO_START_BATCH_SIZE, (stream) => playPreparedAudio(stream, channel))
     const playedStreamIds = []
 
     results.forEach((result, index) => {
@@ -594,16 +746,8 @@ export default function App() {
   }
 
   const handleReconnect = async (streamId) => {
-    const audio = audioRefs.current[streamId]
-    if (!audio) return
-
     const stream = streams.find((item) => item.id === streamId)
     if (!stream) return
-
-    audio.pause()
-    audio.dataset.playbackMode = 'proxy'
-    audio.src = buildPlaybackUrl(stream)
-    audio.load()
 
     setProbeStates((state) => ({
       ...state,
@@ -614,6 +758,8 @@ export default function App() {
       }
     }))
 
+    await reconnectAndPlay(stream, STREAM_CHANNEL)
+
     const nowPlaying = await fetchNowPlaying(stream.metadataUrl)
 
     setNowPlayingStates((state) => ({
@@ -623,17 +769,8 @@ export default function App() {
   }
 
   const handleFmReconnect = async (streamId) => {
-    const audioKey = getAudioKey(streamId, FM_CHANNEL)
-    const audio = audioRefs.current[audioKey]
-    if (!audio) return
-
     const stream = streams.find((item) => item.id === streamId)
     if (!stream?.fmMonitorUrl) return
-
-    audio.pause()
-    audio.dataset.playbackMode = 'proxy'
-    audio.src = buildFmPlaybackUrl(stream)
-    audio.load()
 
     setFmProbeStates((state) => ({
       ...state,
@@ -644,50 +781,33 @@ export default function App() {
       }
     }))
 
-    const playedStreamIds = await startStreams([stream], FM_CHANNEL, fmAudioStates)
-
-    setFmAudioStates((state) => ({
-      ...state,
-      [streamId]: {
-        ...state[streamId],
-        isPlaying: playedStreamIds.includes(streamId)
-      }
-    }))
+    await reconnectAndPlay(stream, FM_CHANNEL)
   }
 
   const handleStartMonitoring = async () => {
+    if (isStartingAudioMonitoring) return
+
+    const sequence = startSequenceRef.current + 1
+    startSequenceRef.current = sequence
+    isAudioMonitoringActiveRef.current = true
     setHasStartedAudioMonitoring(true)
+    setIsStartingAudioMonitoring(true)
 
-    const playedStreamIds = await startStreams(monitoredStreams)
-    const playedFmStreamIds = await startStreams(monitoredStreams, FM_CHANNEL, fmAudioStates)
-    const playedIdSet = new Set(playedStreamIds)
-    const playedFmIdSet = new Set(playedFmStreamIds)
+    try {
+      await Promise.allSettled([
+        startStreams(monitoredStreams, STREAM_CHANNEL, audioStatesRef.current),
+        startStreams(monitoredStreams, FM_CHANNEL, fmAudioStatesRef.current)
+      ])
 
-    setAudioStates((state) => ({
-      ...state,
-      ...Object.fromEntries(
-        monitoredStreams.map((stream) => [
-          stream.id,
-          {
-            ...state[stream.id],
-            isPlaying: playedIdSet.has(stream.id)
-          }
-        ])
-      )
-    }))
-
-    setFmAudioStates((state) => ({
-      ...state,
-      ...Object.fromEntries(
-        monitoredStreams.map((stream) => [
-          stream.id,
-          {
-            ...state[stream.id],
-            isPlaying: playedFmIdSet.has(stream.id)
-          }
-        ])
-      )
-    }))
+      await Promise.allSettled([
+        recoverMissingStartedStreams(monitoredStreams, STREAM_CHANNEL, sequence),
+        recoverMissingStartedStreams(monitoredStreams, FM_CHANNEL, sequence)
+      ])
+    } finally {
+      if (startSequenceRef.current === sequence) {
+        setIsStartingAudioMonitoring(false)
+      }
+    }
   }
 
   const handleMuteAll = () => {
@@ -736,12 +856,17 @@ export default function App() {
   }
 
   const handleReconnectAll = async () => {
-    for (const stream of monitoredStreams) {
-      await handleReconnect(stream.id)
-      if (stream.fmMonitorUrl) {
-        await handleFmReconnect(stream.id)
-      }
+    if (!hasStartedAudioMonitoring) {
+      setHasStartedAudioMonitoring(true)
+      isAudioMonitoringActiveRef.current = true
     }
+
+    await Promise.allSettled(
+      monitoredStreams.flatMap((stream) => [
+        handleReconnect(stream.id),
+        stream.fmMonitorUrl ? handleFmReconnect(stream.id) : Promise.resolve()
+      ])
+    )
   }
 
   const handleToggleStreamSelection = (streamId) => {
@@ -761,13 +886,17 @@ export default function App() {
   const handleMonitorSingle = () => {
     if (!singleStreamId) return
     setSelectedStreamIds([singleStreamId])
+    isAudioMonitoringActiveRef.current = false
     setHasStartedAudioMonitoring(false)
+    setIsStartingAudioMonitoring(false)
     setIsFilterOpen(false)
   }
 
   const handleMonitorAll = () => {
     setSelectedStreamIds(allStreamIds)
+    isAudioMonitoringActiveRef.current = false
     setHasStartedAudioMonitoring(false)
+    setIsStartingAudioMonitoring(false)
     setIsFilterOpen(false)
   }
 
@@ -806,9 +935,9 @@ export default function App() {
   return (
     <main className="app-shell">
       <section className="control-bar" aria-label="Controles de monitoramento">
-        <button type="button" className="control-button" onClick={handleStartMonitoring} disabled={monitoredStreams.length === 0}>
+        <button type="button" className="control-button" onClick={handleStartMonitoring} disabled={monitoredStreams.length === 0 || isStartingAudioMonitoring}>
           <Headphones size={18} aria-hidden="true" />
-          {hasStartedAudioMonitoring ? 'Monitoramento iniciado' : 'Iniciar monitoramento'}
+          {isStartingAudioMonitoring ? 'Iniciando...' : hasStartedAudioMonitoring ? 'Monitoramento iniciado' : 'Iniciar monitoramento'}
         </button>
         <button type="button" className="control-button is-mute" onClick={handleMuteAll} disabled={monitoredStreams.length === 0}>
           <VolumeX size={18} aria-hidden="true" />

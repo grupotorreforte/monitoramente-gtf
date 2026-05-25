@@ -172,8 +172,8 @@ export const streams = [
     frequency: '89,5 FM',
     host: 'srv.soundstream.com.br',
     slug: 'maravilhafmmontesclaros',
-    //fmMonitorUrl: 'http://192.168.70.253:8870/radiofm_montesclaros',
-    //fmFallbackUrl: 'http://streaming.grupogtf.com.br:8870/radiofm_montesclaros',
+    fmMonitorUrl: 'http://192.168.70.253:8870/radiofm_montesclaros',
+    fmFallbackUrl: 'http://streaming.grupogtf.com.br:8870/radiofm_montesclaros',
     port: 8020
   }),
   buildSrvstm({

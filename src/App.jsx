@@ -23,6 +23,7 @@ const AUDIO_AUTO_RECONNECT_DELAY_MS = 1200
 const AUDIO_START_BATCH_SIZE = 4
 const AUDIO_START_RECOVERY_ATTEMPTS = 4
 const AUDIO_START_RECOVERY_DELAY_MS = 1800
+const AUDIO_PROXY_FAILURE_COOLDOWN_MS = 300000
 const STREAM_CHANNEL = 'stream'
 const FM_CHANNEL = 'fm'
 
@@ -150,6 +151,17 @@ function getAudioKey(streamId, channel = STREAM_CHANNEL) {
   return channel === FM_CHANNEL ? `${streamId}:fm` : streamId
 }
 
+function mergeProbeState(currentProbe, nextProbe) {
+  if (currentProbe?.status === 'online' && nextProbe.status === 'checking') {
+    return {
+      ...currentProbe,
+      checkedAt: nextProbe.checkedAt
+    }
+  }
+
+  return nextProbe
+}
+
 export default function App() {
   const audioRefs = useRef({})
   const audioContextRef = useRef(null)
@@ -163,6 +175,7 @@ export default function App() {
   const selectedIdSetRef = useRef(new Set(allStreamIds))
   const isAudioMonitoringActiveRef = useRef(false)
   const startSequenceRef = useRef(0)
+  const proxyFailureUntilRef = useRef({})
   const [probeStates, setProbeStates] = useState(createProbeState)
   const [fmProbeStates, setFmProbeStates] = useState(createFmProbeState)
   const [nowPlayingStates, setNowPlayingStates] = useState(createNowPlayingState)
@@ -281,12 +294,16 @@ export default function App() {
   const resetAudioSource = (stream, channel = STREAM_CHANNEL) => {
     const audioKey = getAudioKey(stream.id, channel)
     const audio = audioRefs.current[audioKey]
-    const playbackUrl = channel === FM_CHANNEL ? buildFmPlaybackUrl(stream) : buildPlaybackUrl(stream)
+    const directUrl = channel === FM_CHANNEL ? getDirectFmPlaybackUrl(stream) : getDirectPlaybackUrl(stream)
+    const shouldUseDirect = directUrl && (proxyFailureUntilRef.current[audioKey] ?? 0) > Date.now()
+    const playbackUrl = shouldUseDirect
+      ? directUrl
+      : channel === FM_CHANNEL ? buildFmPlaybackUrl(stream) : buildPlaybackUrl(stream)
 
     if (!audio || !playbackUrl) return false
 
     audio.pause()
-    audio.dataset.playbackMode = 'proxy'
+    audio.dataset.playbackMode = shouldUseDirect ? 'direct' : 'proxy'
     audio.src = playbackUrl
     audio.load()
     return true
@@ -299,6 +316,7 @@ export default function App() {
 
     if (!audio || !directUrl) return false
 
+    proxyFailureUntilRef.current[audioKey] = Date.now() + AUDIO_PROXY_FAILURE_COOLDOWN_MS
     audio.dataset.playbackMode = 'direct'
     audio.src = directUrl
     audio.load()
@@ -404,7 +422,7 @@ export default function App() {
             markChannelPlaying(stream.id, channel, true)
             return true
           } catch {
-            resetAudioSource(stream, channel)
+            audio.load()
           }
         }
       }
@@ -421,7 +439,12 @@ export default function App() {
     if (!audio || !isAudioMonitoringActiveRef.current) return
     if (reconnectTimersRef.current[audioKey]) return
 
-    markChannelPlaying(stream.id, channel, false)
+    if (audio.dataset.playbackMode === 'proxy') {
+      const directUrl = channel === FM_CHANNEL ? getDirectFmPlaybackUrl(stream) : getDirectPlaybackUrl(stream)
+      if (directUrl) {
+        proxyFailureUntilRef.current[audioKey] = Date.now() + AUDIO_PROXY_FAILURE_COOLDOWN_MS
+      }
+    }
 
     reconnectTimersRef.current[audioKey] = window.setTimeout(async () => {
       delete reconnectTimersRef.current[audioKey]
@@ -549,6 +572,10 @@ export default function App() {
       setNowPlayingStates((current) => {
         const nextState = { ...current }
         results.forEach(([streamId, nowPlaying]) => {
+          if (nowPlaying.status === 'unavailable' && !['idle', 'unavailable'].includes(current[streamId]?.status)) {
+            return
+          }
+
           nextState[streamId] = nowPlaying
         })
         return nextState
@@ -578,13 +605,14 @@ export default function App() {
 
       setProbeStates((state) => ({
         ...state,
-        [stream.id]: probe
+        [stream.id]: mergeProbeState(state[stream.id], probe)
       }))
 
       const previousStatus = previousStatusesRef.current[stream.id]
-      previousStatusesRef.current[stream.id] = probe.status
+      const nextStatus = previousStatus === 'online' && probe.status === 'checking' ? previousStatus : probe.status
+      previousStatusesRef.current[stream.id] = nextStatus
 
-      if (previousStatus === 'online' && ['offline', 'timeout'].includes(probe.status)) {
+      if (previousStatus === 'online' && ['offline', 'timeout'].includes(nextStatus)) {
         const alert = {
           id: `${stream.id}-${Date.now()}`,
           streamName: stream.name,
@@ -650,7 +678,7 @@ export default function App() {
     const handleFmStatus = (probe) => {
       setFmProbeStates((state) => ({
         ...state,
-        [probe.id]: probe
+        [probe.id]: mergeProbeState(state[probe.id], probe)
       }))
     }
 

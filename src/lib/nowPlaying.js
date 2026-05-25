@@ -9,13 +9,15 @@ export const emptyNowPlaying = {
   detail: 'Nenhuma consulta executada.'
 }
 
+let isNowPlayingApiUnavailable = false
+
 export async function fetchNowPlaying(metadataUrl) {
-  if (!metadataUrl) {
+  if (!metadataUrl || isNowPlayingApiUnavailable) {
     return {
       ...emptyNowPlaying,
       status: 'unavailable',
       title: 'Metadados indisponíveis',
-      detail: 'URL de metadata não configurada.',
+      detail: !metadataUrl ? 'URL de metadata não configurada.' : 'API de metadata indisponível neste ambiente.',
       checkedAt: new Date().toISOString()
     }
   }
@@ -28,6 +30,10 @@ export async function fetchNowPlaying(metadataUrl) {
     })
 
     if (!response.ok) {
+      if (response.status === 404) {
+        isNowPlayingApiUnavailable = true
+      }
+
       throw new Error(`API HTTP ${response.status}`)
     }
 

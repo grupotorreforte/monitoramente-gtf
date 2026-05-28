@@ -102,6 +102,7 @@ export const streams = [
     frequency: '106,5 MHz',
     host: 'srv2.soundstream.com.br',
     slug: 'maravilhafmgovernadorvaladares',
+    streamUrl: 'https://srv2.soundstream.com.br/listen/maravilhagvaladares/live',
     fmMonitorUrl: 'http://192.168.70.253:8870/radiofm_governadorvaladares',
     fmFallbackUrl: 'http://streaming.grupogtf.com.br:8870/radiofm_governadorvaladares',
     port: 8070

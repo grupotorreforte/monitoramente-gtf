@@ -40,7 +40,7 @@ export const streams = [
     station: 'Maravilha FM - Afiliadas',
     city: 'Governador Valadares',
     state: 'MG',
-    frequency: '89,3 MHz',
+    frequency: '106,5 MHz',
     provider: 'soundstream',
     streamUrl: 'https://srv2.soundstream.com.br/listen/maravilhagvaladares/live'
   },

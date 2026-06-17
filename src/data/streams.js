@@ -115,7 +115,7 @@ export const streams = [
     host: 'srv2.soundstream.com.br',
     slug: 'maravilhafmipatinga',
     streamUrl: 'https://srv2.soundstream.com.br/listen/maravilhafmipatinga/live',
-    fmMonitorUrl: 'http://192.168.70.253:8870/radiofm_ipatinga',
+    fmMonitorUrl: 'https://192.168.70.253:8873/radiofm_ipatinga',
     fmFallbackUrl: 'http://streaming.grupogtf.com.br:8870/radiofm_ipatinga',
     port: 8030
   }),

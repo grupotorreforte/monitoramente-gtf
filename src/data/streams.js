@@ -92,7 +92,7 @@ export const streams = [
     host: 'srv2.soundstream.com.br',
     slug: 'maravilhafmbarbacena',
     fmMonitorUrl: 'https://192.168.70.253:8873/radiofm_barbacena',
-    fmFallbackUrl: 'http://streaming.grupogtf.com.br:8870/radiofm_barbacena',
+    fmFallbackUrl: 'https://streaming.grupogtf.com.br:8870/radiofm_barbacena',
     port: 8020
   }),
     buildSoundstream({
@@ -104,7 +104,7 @@ export const streams = [
     slug: 'maravilhafmgovernadorvaladares',
     streamUrl: 'https://srv2.soundstream.com.br/listen/maravilhagvaladares/live',
     fmMonitorUrl: 'https://192.168.70.253:8873/radiofm_governadorvaladares',
-    fmFallbackUrl: 'http://streaming.grupogtf.com.br:8870/radiofm_governadorvaladares',
+    fmFallbackUrl: 'https://streaming.grupogtf.com.br:8873/radiofm_governadorvaladares',
     port: 8070
   }),
   buildSoundstream({
@@ -116,7 +116,7 @@ export const streams = [
     slug: 'maravilhafmipatinga',
     streamUrl: 'https://srv2.soundstream.com.br/listen/maravilhafmipatinga/live',
     fmMonitorUrl: 'https://192.168.70.253:8873/radiofm_ipatinga',
-    fmFallbackUrl: 'http://streaming.grupogtf.com.br:8870/radiofm_ipatinga',
+    fmFallbackUrl: 'https://streaming.grupogtf.com.br:8873/radiofm_ipatinga',
     port: 8030
   }),
   buildSoundstream({
@@ -129,7 +129,7 @@ export const streams = [
     port: 8030,
     fmMonitorUrl: 'ADICIONE_AQUI_O_LINK_DO_FM',
     streamUrl: 'https://srv.soundstream.com.br:8030/live',
-    fallbackUrl: null,
+    fallbackUrl: "https://srv.soundstream.com.br:8030/live",
     metadataUrl: null
   }),
   buildSoundstream({

@@ -1,3 +1,24 @@
+const FM_INTERNAL_BASE_URL = 'https://192.168.70.253:8873'
+const FM_EXTERNAL_BASE_URL = 'https://streaming.grupogtf.com.br:8873'
+
+function buildRelayUrl(path, baseUrl) {
+  return `${baseUrl}/${path}`
+}
+
+function buildRelayPair(path) {
+  return {
+    streamUrl: buildRelayUrl(path, FM_INTERNAL_BASE_URL),
+    fallbackUrl: buildRelayUrl(path, FM_EXTERNAL_BASE_URL)
+  }
+}
+
+function buildFmRelayPair(path) {
+  return {
+    fmMonitorUrl: buildRelayUrl(path, FM_INTERNAL_BASE_URL),
+    fmFallbackUrl: buildRelayUrl(path, FM_EXTERNAL_BASE_URL)
+  }
+}
+
 function buildSoundstream({
   id,
   name,
@@ -34,7 +55,7 @@ function buildSoundstream({
   }
 }
 
-function buildSrvstm({ id, name, city, state = 'MG', frequency, streamUrl, fmMonitorUrl = null, fmFallbackUrl = null }) {
+function buildSrvstm({ id, name, city, state = 'MG', frequency, streamUrl, fallbackUrl = null, fmMonitorUrl = null, fmFallbackUrl = null }) {
   return {
     id,
     name,
@@ -47,7 +68,7 @@ function buildSrvstm({ id, name, city, state = 'MG', frequency, streamUrl, fmMon
     streamUrl,
     publicUrl: streamUrl,
     metadataUrl: null,
-    fallbackUrl: null,
+    fallbackUrl,
     fmMonitorUrl,
     fmFallbackUrl,
     aliases: [],
@@ -92,7 +113,7 @@ export const streams = [
     host: 'srv2.soundstream.com.br',
     slug: 'maravilhafmbarbacena',
     fmMonitorUrl: 'https://192.168.70.253:8873/radiofm_barbacena',
-    fmFallbackUrl: 'https://streaming.grupogtf.com.br:8870/radiofm_barbacena',
+    fmFallbackUrl: 'https://streaming.grupogtf.com.br:8873/radiofm_barbacena',
     port: 8020
   }),
     buildSoundstream({
@@ -234,6 +255,30 @@ export const streams = [
     fmMonitorUrl: 'https://192.168.70.253:8873/radiofm_araxa',
     fmFallbackUrl: 'https://streaming.grupogtf.com.br:8873/radiofm_araxa',
     port: 8290
+  }),
+  buildSrvstm({
+    id: 'maravilha-fm-varginha',
+    name: 'Maravilha FM Varginha',
+    city: 'Varginha',
+    frequency: 'Afiliada',
+    ...buildRelayPair('varginha'),
+    ...buildFmRelayPair('radiofm_varginha')
+  }),
+  buildSrvstm({
+    id: 'maravilha-fm-pouso-alegre',
+    name: 'Maravilha FM Pouso Alegre',
+    city: 'Pouso Alegre',
+    frequency: 'Afiliada',
+    ...buildRelayPair('pousoalegre'),
+    ...buildFmRelayPair('radiofm_pousoalegre')
+  }),
+  buildSrvstm({
+    id: 'maravilha-fm-diamantina',
+    name: 'Maravilha FM Diamantina',
+    city: 'Diamantina',
+    frequency: 'Afiliada',
+    ...buildRelayPair('diamantina'),
+    ...buildFmRelayPair('radiofm_diamantina')
   })
 ]
 export const allStreamIds = streams.map((stream) => stream.id)

@@ -143,4 +143,40 @@ export const streams = [
     provider: 'soundstream',
     streamUrl: 'https://srv.soundstream.com.br/listen/maravilhateofilootoni/live'
   },
+  {
+    id: 'varginha',
+    station: 'Maravilha FM - Afiliadas',
+    city: 'Varginha',
+    state: 'MG',
+    frequency: 'Afiliada',
+    provider: 'gtf-relay',
+    streamUrl: 'https://192.168.70.253:8873/varginha',
+    fallbackUrl: 'https://streaming.grupogtf.com.br:8873/varginha',
+    fmMonitorUrl: 'https://192.168.70.253:8873/radiofm_varginha',
+    fmFallbackUrl: 'https://streaming.grupogtf.com.br:8873/radiofm_varginha'
+  },
+  {
+    id: 'pouso-alegre',
+    station: 'Maravilha FM - Afiliadas',
+    city: 'Pouso Alegre',
+    state: 'MG',
+    frequency: 'Afiliada',
+    provider: 'gtf-relay',
+    streamUrl: 'https://192.168.70.253:8873/pousoalegre',
+    fallbackUrl: 'https://streaming.grupogtf.com.br:8873/pousoalegre',
+    fmMonitorUrl: 'https://192.168.70.253:8873/radiofm_pousoalegre',
+    fmFallbackUrl: 'https://streaming.grupogtf.com.br:8873/radiofm_pousoalegre'
+  },
+  {
+    id: 'diamantina',
+    station: 'Maravilha FM - Afiliadas',
+    city: 'Diamantina',
+    state: 'MG',
+    frequency: 'Afiliada',
+    provider: 'gtf-relay',
+    streamUrl: 'https://192.168.70.253:8873/diamantina',
+    fallbackUrl: 'https://streaming.grupogtf.com.br:8873/diamantina',
+    fmMonitorUrl: 'https://192.168.70.253:8873/radiofm_diamantina',
+    fmFallbackUrl: 'https://streaming.grupogtf.com.br:8873/radiofm_diamantina'
+  },
 ]

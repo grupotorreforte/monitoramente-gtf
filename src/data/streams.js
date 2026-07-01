@@ -8,17 +8,17 @@ function buildRelayUrl(path, baseUrl) {
 
 function buildRelayPair(path) {
   return {
-    streamUrl: buildRelayUrl(path, FM_INTERNAL_BASE_URL),
+    streamUrl: buildRelayUrl(path, FM_INTERNAL_HTTP_BASE_URL),
     fallbackUrl: buildRelayUrl(path, FM_EXTERNAL_BASE_URL),
-    fallbackUrls: [buildRelayUrl(path, FM_INTERNAL_HTTP_BASE_URL)]
+    fallbackUrls: [buildRelayUrl(path, FM_INTERNAL_BASE_URL)]
   }
 }
 
 function buildFmRelayPair(path) {
   return {
-    fmMonitorUrl: buildRelayUrl(path, FM_INTERNAL_BASE_URL),
+    fmMonitorUrl: buildRelayUrl(path, FM_INTERNAL_HTTP_BASE_URL),
     fmFallbackUrl: buildRelayUrl(path, FM_EXTERNAL_BASE_URL),
-    fmFallbackUrls: [buildRelayUrl(path, FM_INTERNAL_HTTP_BASE_URL)]
+    fmFallbackUrls: [buildRelayUrl(path, FM_INTERNAL_BASE_URL)]
   }
 }
 
@@ -26,6 +26,7 @@ function buildStreamRelayFallbacks(path) {
   return {
     fallbackUrls: [
       buildRelayUrl(path, FM_INTERNAL_HTTP_BASE_URL),
+      buildRelayUrl(path, FM_INTERNAL_BASE_URL),
       buildRelayUrl(path, FM_EXTERNAL_BASE_URL)
     ]
   }

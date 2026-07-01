@@ -58,7 +58,10 @@ export function buildAttemptUrls(url, fallbackUrl, fallbackUrls = []) {
         ? fallbackUrls
         : []
 
-  return [...new Set([url, ...parsedFallbackUrls, fallbackUrl].filter(Boolean))]
+  const attempts = [...new Set([url, ...parsedFallbackUrls, fallbackUrl].filter(Boolean))]
+  const publicAttempts = isPublicRuntime() ? attempts.filter((attemptUrl) => !isPrivateNetworkUrl(attemptUrl)) : attempts
+
+  return prioritizeInternalHttp(publicAttempts)
 }
 
 function parseFallbackUrls(value) {
@@ -71,6 +74,44 @@ function parseFallbackUrls(value) {
       .map((item) => item.trim())
       .filter(Boolean)
   }
+}
+
+function isPublicRuntime() {
+  return process.env.VERCEL === '1' || Boolean(process.env.VERCEL_ENV)
+}
+
+function isPrivateNetworkUrl(value) {
+  try {
+    const { hostname } = new URL(value)
+    return (
+      hostname === 'localhost' ||
+      hostname === '127.0.0.1' ||
+      hostname.startsWith('192.168.') ||
+      hostname.startsWith('10.') ||
+      /^172\.(1[6-9]|2\d|3[0-1])\./.test(hostname)
+    )
+  } catch {
+    return false
+  }
+}
+
+function prioritizeInternalHttp(attempts) {
+  const internalHttp = []
+  const remaining = []
+
+  attempts.forEach((attemptUrl) => {
+    try {
+      const parsedUrl = new URL(attemptUrl)
+      if (parsedUrl.protocol === 'http:' && parsedUrl.hostname === '192.168.70.253' && parsedUrl.port === '8870') {
+        internalHttp.push(attemptUrl)
+        return
+      }
+    } catch {}
+
+    remaining.push(attemptUrl)
+  })
+
+  return [...internalHttp, ...remaining]
 }
 
 export async function fetchNowPlaying(metadataUrl) {

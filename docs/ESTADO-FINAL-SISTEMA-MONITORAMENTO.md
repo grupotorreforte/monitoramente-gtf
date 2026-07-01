@@ -84,7 +84,8 @@ Regra:
 
 - Caminho sem `radiofm_`: usado como link normal de streaming quando nao houver outro link publico.
 - Caminho com `radiofm_`: usado como retorno FM da radio.
-- Quando existirem multiplas URLs, o monitoramento tenta URL principal, HTTP interno e fallback externo.
+- Quando existirem multiplas URLs, o monitoramento local prioriza `http://192.168.70.253:8870`.
+- Em ambiente publico como Vercel, URLs privadas `192.168.*`, `10.*`, `172.16-31.*` e `localhost` sao ignoradas automaticamente pelo backend.
 
 Exemplo Uberaba:
 
@@ -171,13 +172,14 @@ FM externo:        https://streaming.grupogtf.com.br:8873/radiofm_diamantina
 
 1. O usuario seleciona as radios no filtro.
 2. O frontend monta a lista `monitoredStreams`.
-3. `watchStreams` abre `EventSource` para `/api/watch-many`.
-4. O backend tenta ler bytes do `streamUrl`.
-5. Se falhar, tenta `fallbackUrl`.
-6. Para FM, o App monta outra lista usando `fmMonitorUrl` e `fmFallbackUrl`.
-7. O backend envia eventos `online`, `offline`, `timeout` ou `checking`.
-8. O card mostra status separado para `STREAMING` e `FM`.
-9. Ao clicar em `Iniciar monitoramento`, o browser tambem inicia players e WebAudio para alimentar VU/waveform.
+3. O monitoramento pesado so inicia apos clicar em `Iniciar monitoramento`.
+4. `watchStreams` abre `EventSource` para `/api/watch-many`.
+5. O backend monta a ordem de tentativas por ambiente.
+6. Dentro da rede da Radio 88 FM, `http://192.168.70.253:8870` e priorizado.
+7. Na Vercel, o backend ignora IP privado e tenta o fallback externo.
+8. O backend envia eventos `online`, `offline`, `timeout` ou `checking`.
+9. O card mostra status separado para `STREAMING` e `FM`.
+10. O browser inicia players e WebAudio para alimentar VU/waveform.
 
 ## Controles Operacionais
 

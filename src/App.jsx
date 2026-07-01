@@ -565,7 +565,7 @@ export default function App() {
     let cancelled = false
 
     async function refreshMetadata() {
-      if (monitoredStreams.length === 0) {
+      if (!hasStartedAudioMonitoring || monitoredStreams.length === 0) {
         return
       }
 
@@ -598,10 +598,10 @@ export default function App() {
       cancelled = true
       window.clearInterval(intervalId)
     }
-  }, [monitoredStreams])
+  }, [hasStartedAudioMonitoring, monitoredStreams])
 
   useEffect(() => {
-    if (monitoredStreams.length === 0) {
+    if (!hasStartedAudioMonitoring || monitoredStreams.length === 0) {
       setIsMonitoring(false)
       return () => {}
     }
@@ -653,9 +653,13 @@ export default function App() {
       cleanupWatcher()
       setIsMonitoring(false)
     }
-  }, [monitoredStreams])
+  }, [hasStartedAudioMonitoring, monitoredStreams])
 
   useEffect(() => {
+    if (!hasStartedAudioMonitoring) {
+      return () => {}
+    }
+
     const fmStreamsToWatch = monitoredStreams
       .filter((stream) => stream.fmMonitorUrl)
       .map((stream) => ({
@@ -705,7 +709,7 @@ export default function App() {
     return () => {
       cleanupWatcher()
     }
-  }, [monitoredStreams])
+  }, [hasStartedAudioMonitoring, monitoredStreams])
 
   const handleToggleMute = (streamId) => {
     const audio = audioRefs.current[streamId]

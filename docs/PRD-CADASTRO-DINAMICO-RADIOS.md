@@ -131,6 +131,8 @@ Ao cadastrar uma radio com base no conf:
 - RNF-03: Deve existir fallback local minimo caso a configuracao remota falhe.
 - RNF-04: Campos sensiveis nao devem ir para o frontend.
 - RNF-05: Alteracoes devem ser auditaveis na fase com banco de dados.
+- RNF-06: Em ambiente publico, o backend deve ignorar URLs privadas para evitar timeouts e lentidao.
+- RNF-07: Em ambiente local dentro da Radio 88 FM, URLs HTTP internas `8870` devem ter prioridade.
 
 ## 10. Arquitetura Recomendada
 

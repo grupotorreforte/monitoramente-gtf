@@ -68,6 +68,12 @@ Servidor interno dentro da Radio 88 FM:
 https://192.168.70.253:8873
 ```
 
+Servidor interno HTTP dentro da Radio 88 FM:
+
+```text
+http://192.168.70.253:8870
+```
+
 Servidor externo para tecnico fora da rede:
 
 ```text
@@ -78,12 +84,16 @@ Regra:
 
 - Caminho sem `radiofm_`: usado como link normal de streaming quando nao houver outro link publico.
 - Caminho com `radiofm_`: usado como retorno FM da radio.
+- Quando existirem multiplas URLs, o monitoramento tenta URL principal, HTTP interno e fallback externo.
 
 Exemplo Uberaba:
 
 ```text
 STREAMING publico: https://stm6.srvstm.com:7006/stream
+STREAMING interno: http://192.168.70.253:8870/uberaba
+STREAMING externo: https://streaming.grupogtf.com.br:8873/uberaba
 FM interno:        https://192.168.70.253:8873/radiofm_uberaba
+FM interno HTTP:   http://192.168.70.253:8870/radiofm_uberaba
 FM externo:        https://streaming.grupogtf.com.br:8873/radiofm_uberaba
 ```
 
@@ -91,8 +101,10 @@ Exemplo para radio cujo stream normal vem do proprio servidor Dell:
 
 ```text
 STREAMING interno: https://192.168.70.253:8873/varginha
+STREAMING HTTP:    http://192.168.70.253:8870/varginha
 STREAMING externo: https://streaming.grupogtf.com.br:8873/varginha
 FM interno:        https://192.168.70.253:8873/radiofm_varginha
+FM interno HTTP:   http://192.168.70.253:8870/radiofm_varginha
 FM externo:        https://streaming.grupogtf.com.br:8873/radiofm_varginha
 ```
 
@@ -126,8 +138,10 @@ Catalogo principal atualizado:
 
 ```text
 STREAMING interno: https://192.168.70.253:8873/varginha
+STREAMING HTTP:    http://192.168.70.253:8870/varginha
 STREAMING externo: https://streaming.grupogtf.com.br:8873/varginha
 FM interno:        https://192.168.70.253:8873/radiofm_varginha
+FM interno HTTP:   http://192.168.70.253:8870/radiofm_varginha
 FM externo:        https://streaming.grupogtf.com.br:8873/radiofm_varginha
 ```
 
@@ -135,8 +149,10 @@ FM externo:        https://streaming.grupogtf.com.br:8873/radiofm_varginha
 
 ```text
 STREAMING interno: https://192.168.70.253:8873/pousoalegre
+STREAMING HTTP:    http://192.168.70.253:8870/pousoalegre
 STREAMING externo: https://streaming.grupogtf.com.br:8873/pousoalegre
 FM interno:        https://192.168.70.253:8873/radiofm_pousoalegre
+FM interno HTTP:   http://192.168.70.253:8870/radiofm_pousoalegre
 FM externo:        https://streaming.grupogtf.com.br:8873/radiofm_pousoalegre
 ```
 
@@ -144,8 +160,10 @@ FM externo:        https://streaming.grupogtf.com.br:8873/radiofm_pousoalegre
 
 ```text
 STREAMING interno: https://192.168.70.253:8873/diamantina
+STREAMING HTTP:    http://192.168.70.253:8870/diamantina
 STREAMING externo: https://streaming.grupogtf.com.br:8873/diamantina
 FM interno:        https://192.168.70.253:8873/radiofm_diamantina
+FM interno HTTP:   http://192.168.70.253:8870/radiofm_diamantina
 FM externo:        https://streaming.grupogtf.com.br:8873/radiofm_diamantina
 ```
 
@@ -186,4 +204,3 @@ FM externo:        https://streaming.grupogtf.com.br:8873/radiofm_diamantina
 - O monitoramento depende de players no navegador para modulacao WebAudio.
 - Em Vercel, a funcao serverless tem limite de duracao; o EventSource reconecta.
 - Deteccao de silencio ainda e visual/operacional, nao uma analise profissional via `ffmpeg`.
-

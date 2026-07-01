@@ -13,5 +13,5 @@ export default async function handler(req, res) {
     return
   }
 
-  sendJson(res, 200, await probeStream(req.query.url, req.query.fallbackUrl))
+  sendJson(res, 200, await probeStream(req.query.url, req.query.fallbackUrl, req.query.fallbackUrls))
 }

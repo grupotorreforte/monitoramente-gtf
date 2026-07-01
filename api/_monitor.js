@@ -50,6 +50,29 @@ export function normalizeSong(song) {
   }
 }
 
+export function buildAttemptUrls(url, fallbackUrl, fallbackUrls = []) {
+  const parsedFallbackUrls =
+    typeof fallbackUrls === 'string'
+      ? parseFallbackUrls(fallbackUrls)
+      : Array.isArray(fallbackUrls)
+        ? fallbackUrls
+        : []
+
+  return [...new Set([url, ...parsedFallbackUrls, fallbackUrl].filter(Boolean))]
+}
+
+function parseFallbackUrls(value) {
+  try {
+    const parsed = JSON.parse(value)
+    return Array.isArray(parsed) ? parsed : []
+  } catch {
+    return value
+      .split(',')
+      .map((item) => item.trim())
+      .filter(Boolean)
+  }
+}
+
 export async function fetchNowPlaying(metadataUrl) {
   if (!metadataUrl) {
     return {
@@ -154,8 +177,8 @@ export async function readStreamBytes(url, timeoutMs = DEFAULT_TIMEOUT_MS) {
   }
 }
 
-export async function probeStream(url, fallbackUrl) {
-  const attempts = [url, fallbackUrl].filter(Boolean)
+export async function probeStream(url, fallbackUrl, fallbackUrls = []) {
+  const attempts = buildAttemptUrls(url, fallbackUrl, fallbackUrls)
   let lastError = null
 
   for (const attemptUrl of attempts) {
@@ -184,8 +207,8 @@ export function sendSse(res, event, payload) {
   res.write(`data: ${JSON.stringify(payload)}\n\n`)
 }
 
-export async function monitorStreamForSse({ id, url, fallbackUrl, res, shouldStop }) {
-  const attempts = [url, fallbackUrl].filter(Boolean)
+export async function monitorStreamForSse({ id, url, fallbackUrl, fallbackUrls = [], res, shouldStop }) {
+  const attempts = buildAttemptUrls(url, fallbackUrl, fallbackUrls)
   let lastError = null
   let consecutiveFailures = 0
 

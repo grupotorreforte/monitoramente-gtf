@@ -1,4 +1,5 @@
 const FM_INTERNAL_BASE_URL = 'https://192.168.70.253:8873'
+const FM_INTERNAL_HTTP_BASE_URL = 'http://192.168.70.253:8870'
 const FM_EXTERNAL_BASE_URL = 'https://streaming.grupogtf.com.br:8873'
 
 function buildRelayUrl(path, baseUrl) {
@@ -8,14 +9,25 @@ function buildRelayUrl(path, baseUrl) {
 function buildRelayPair(path) {
   return {
     streamUrl: buildRelayUrl(path, FM_INTERNAL_BASE_URL),
-    fallbackUrl: buildRelayUrl(path, FM_EXTERNAL_BASE_URL)
+    fallbackUrl: buildRelayUrl(path, FM_EXTERNAL_BASE_URL),
+    fallbackUrls: [buildRelayUrl(path, FM_INTERNAL_HTTP_BASE_URL)]
   }
 }
 
 function buildFmRelayPair(path) {
   return {
     fmMonitorUrl: buildRelayUrl(path, FM_INTERNAL_BASE_URL),
-    fmFallbackUrl: buildRelayUrl(path, FM_EXTERNAL_BASE_URL)
+    fmFallbackUrl: buildRelayUrl(path, FM_EXTERNAL_BASE_URL),
+    fmFallbackUrls: [buildRelayUrl(path, FM_INTERNAL_HTTP_BASE_URL)]
+  }
+}
+
+function buildStreamRelayFallbacks(path) {
+  return {
+    fallbackUrls: [
+      buildRelayUrl(path, FM_INTERNAL_HTTP_BASE_URL),
+      buildRelayUrl(path, FM_EXTERNAL_BASE_URL)
+    ]
   }
 }
 
@@ -31,9 +43,11 @@ function buildSoundstream({
   metadataOfflineMeansDown = false,
   streamUrl,
   fallbackUrl,
+  fallbackUrls = [],
   metadataUrl,
   fmMonitorUrl = null,
-  fmFallbackUrl = null
+  fmFallbackUrl = null,
+  fmFallbackUrls = []
 }) {
   return {
     id,
@@ -48,14 +62,28 @@ function buildSoundstream({
     publicUrl: `https://${host}/public/${slug}`,
     metadataUrl: metadataUrl === undefined ? `https://${host}/api/nowplaying/${slug}` : metadataUrl,
     fallbackUrl: fallbackUrl === undefined ? `http://${host}:${port}/live` : fallbackUrl,
+    fallbackUrls,
     fmMonitorUrl,
     fmFallbackUrl,
+    fmFallbackUrls,
     aliases,
     metadataOfflineMeansDown
   }
 }
 
-function buildSrvstm({ id, name, city, state = 'MG', frequency, streamUrl, fallbackUrl = null, fmMonitorUrl = null, fmFallbackUrl = null }) {
+function buildSrvstm({
+  id,
+  name,
+  city,
+  state = 'MG',
+  frequency,
+  streamUrl,
+  fallbackUrl = null,
+  fallbackUrls = [],
+  fmMonitorUrl = null,
+  fmFallbackUrl = null,
+  fmFallbackUrls = []
+}) {
   return {
     id,
     name,
@@ -69,8 +97,10 @@ function buildSrvstm({ id, name, city, state = 'MG', frequency, streamUrl, fallb
     publicUrl: streamUrl,
     metadataUrl: null,
     fallbackUrl,
+    fallbackUrls,
     fmMonitorUrl,
     fmFallbackUrl,
+    fmFallbackUrls,
     aliases: [],
     metadataOfflineMeansDown: false
   }
@@ -83,6 +113,8 @@ export const streams = [
     state: 'RJ',
     frequency: '88,7 MHz',
     streamUrl: 'https://stm39.srvstm.com:9776/stream',
+    ...buildStreamRelayFallbacks('88fm'),
+    ...buildFmRelayPair('radiofm_88fm'),
     
   }),
   buildSrvstm({
@@ -91,8 +123,8 @@ export const streams = [
     city: 'Belo Horizonte',
     frequency: '89,1 MHz',
     streamUrl: 'https://stm19.srvstm.com:7080/stream',
-    fmMonitorUrl: 'https://192.168.70.253:8873/radiofm_89fm',
-    fmFallbackUrl: 'https://streaming.grupogtf.com.br:8873/radiofm_89fm',
+    ...buildStreamRelayFallbacks('89fm'),
+    ...buildFmRelayPair('radiofm_89fm'),
   }),
   buildSoundstream({
     id: 'maravilha-fm-cambui',
@@ -102,6 +134,7 @@ export const streams = [
     host: 'srv2.soundstream.com.br',
     slug: 'maravilhafmcambui',
     port: 8040,
+    ...buildStreamRelayFallbacks('Cambui'),
     // fmMonitorUrl: 'ADICIONE_AQUI_O_LINK_DO_FM',
     metadataOfflineMeansDown: true
   }),
@@ -112,8 +145,8 @@ export const streams = [
     frequency: '89,3 MHz',
     host: 'srv2.soundstream.com.br',
     slug: 'maravilhafmbarbacena',
-    fmMonitorUrl: 'https://192.168.70.253:8873/radiofm_barbacena',
-    fmFallbackUrl: 'https://streaming.grupogtf.com.br:8873/radiofm_barbacena',
+    ...buildStreamRelayFallbacks('barbacena'),
+    ...buildFmRelayPair('radiofm_barbacena'),
     port: 8020
   }),
     buildSoundstream({
@@ -124,8 +157,8 @@ export const streams = [
     host: 'srv2.soundstream.com.br',
     slug: 'maravilhafmgovernadorvaladares',
     streamUrl: 'https://srv2.soundstream.com.br/listen/maravilhagvaladares/live',
-    fmMonitorUrl: 'https://192.168.70.253:8873/radiofm_governadorvaladares',
-    fmFallbackUrl: 'https://streaming.grupogtf.com.br:8873/radiofm_governadorvaladares',
+    ...buildStreamRelayFallbacks('governadorvaladares'),
+    ...buildFmRelayPair('radiofm_governadorvaladares'),
     port: 8070
   }),
   buildSoundstream({
@@ -136,8 +169,8 @@ export const streams = [
     host: 'srv2.soundstream.com.br',
     slug: 'maravilhafmipatinga',
     streamUrl: 'https://srv2.soundstream.com.br/listen/maravilhafmipatinga/live',
-    fmMonitorUrl: 'https://192.168.70.253:8873/radiofm_ipatinga',
-    fmFallbackUrl: 'https://streaming.grupogtf.com.br:8873/radiofm_ipatinga',
+    ...buildStreamRelayFallbacks('ipatinga'),
+    ...buildFmRelayPair('radiofm_ipatinga'),
     port: 8030
   }),
   buildSoundstream({
@@ -148,10 +181,10 @@ export const streams = [
     host: 'srv.soundstream.com.br',
     slug: 'maravilhafmjf',
     port: 8030,
-    fmMonitorUrl: 'https://192.168.70.253:8873/radiofm_juizdefora',
+    ...buildStreamRelayFallbacks('juizdefora'),
+    ...buildFmRelayPair('radiofm_juizdefora'),
     streamUrl: 'https://srv.soundstream.com.br:8030/live',
     fallbackUrl: "https://srv.soundstream.com.br:8030/live",
-    fmFallbackUrl: 'https://streaming.grupogtf.com.br:8873/radiofm_juizdefora',
     metadataUrl: null
   }),
   buildSoundstream({
@@ -163,8 +196,8 @@ export const streams = [
     slug: 'maravilhafm',
     port: 8180,
     streamUrl: 'https://srv.soundstream.com.br/listen/maravilhafm/live',
-    fmMonitorUrl: 'https://192.168.70.253:8873/radiofm_joaopinheiro',
-    fmFallbackUrl: 'https://streaming.grupogtf.com.br:8873/radiofm_joaopinheiro',
+    ...buildStreamRelayFallbacks('joaopinheiro'),
+    ...buildFmRelayPair('radiofm_joaopinheiro'),
     aliases: ['Rádio Maravilha FM']
   }),
   buildSoundstream({
@@ -175,8 +208,8 @@ export const streams = [
     host: 'srv.soundstream.com.br',
     slug: 'maravilhateofilootoni',
     streamUrl: 'https://srv.soundstream.com.br/listen/maravilhateofilootoni/live',
-    fmMonitorUrl: 'https://192.168.70.253:8873/radiofm_teofilootoni',
-    fmFallbackUrl: 'https://streaming.grupogtf.com.br:8873/radiofm_teofilootoni',
+    ...buildStreamRelayFallbacks('teofilo_otoni'),
+    ...buildFmRelayPair('radiofm_teofilootoni'),
     port: 8240
   }),
   buildSoundstream({
@@ -187,8 +220,8 @@ export const streams = [
     host: 'srv.soundstream.com.br',
     slug: 'maravilhacamposgerais',
     streamUrl: 'https://srv.soundstream.com.br/listen/maravilhacamposgerais/live',
-    fmMonitorUrl: 'https://192.168.70.253:8873/radiofm_camposgerais',
-    fmFallbackUrl: 'https://streaming.grupogtf.com.br:8873/radiofm_camposgerais',
+    ...buildStreamRelayFallbacks('camposgerais'),
+    ...buildFmRelayPair('radiofm_camposgerais'),
     port: 8170
   }),
   buildSoundstream({
@@ -199,8 +232,8 @@ export const streams = [
     host: 'srv.soundstream.com.br',
     slug: 'maravilhafmuba',
     streamUrl: 'https://srv.soundstream.com.br/listen/maravilhafmuba/live',
-    fmMonitorUrl: 'https://192.168.70.253:8873/radiofm_uba',
-    fmFallbackUrl: 'https://streaming.grupogtf.com.br:8873/radiofm_uba',
+    ...buildStreamRelayFallbacks('uba'),
+    ...buildFmRelayPair('radiofm_uba'),
     port: 8040
   }),
   buildSoundstream({
@@ -210,8 +243,8 @@ export const streams = [
     frequency: '89,5 FM',
     host: 'srv.soundstream.com.br',
     slug: 'maravilhafmmontesclaros',
-    fmMonitorUrl: 'https://192.168.70.253:8873/radiofm_montesclaros',
-    fmFallbackUrl: 'https://streaming.grupogtf.com.br:8873/radiofm_montesclaros',
+    ...buildStreamRelayFallbacks('montesclaros'),
+    ...buildFmRelayPair('radiofm_montesclaros'),
     port: 8020
   }),
   buildSrvstm({
@@ -219,18 +252,18 @@ export const streams = [
     name: 'Maravilha FM Uberlândia',
     city: 'Uberlândia',
     frequency: '89,7 FM',
-    fmMonitorUrl: 'https://192.168.70.253:8873/radiofm_uberlandia',
-    fmFallbackUrl: 'https://streaming.grupogtf.com.br:8873/radiofm_uberlandia',
-    streamUrl: 'https://stm6.srvstm.com:7076/stream'
+    streamUrl: 'https://stm6.srvstm.com:7076/stream',
+    ...buildStreamRelayFallbacks('uberlandia'),
+    ...buildFmRelayPair('radiofm_uberlandia')
   }),
   buildSrvstm({
     id: 'maravilha-fm-uberaba',
     name: 'Maravilha FM Uberaba',
     city: 'Uberaba',
     frequency: '89,3 FM',
-    fmMonitorUrl: 'https://192.168.70.253:8873/radiofm_uberaba',
-    fmFallbackUrl: 'https://streaming.grupogtf.com.br:8873/radiofm_uberaba',
-    streamUrl: 'https://stm6.srvstm.com:7006/stream'
+    streamUrl: 'https://stm6.srvstm.com:7006/stream',
+    ...buildStreamRelayFallbacks('uberaba'),
+    ...buildFmRelayPair('radiofm_uberaba')
   }),
   buildSoundstream({
     id: 'maravilha-fm-leopoldina',
@@ -240,8 +273,8 @@ export const streams = [
     host: 'srv.soundstream.com.br',
     slug: 'maravilhafmleopoldina',
     streamUrl: 'https://srv.soundstream.com.br/listen/maravilhafmleopoldina/live',
-    fmMonitorUrl: 'https://192.168.70.253:8873/radiofm_leopoldina',
-    fmFallbackUrl: 'https://streaming.grupogtf.com.br:8873/radiofm_leopoldina',
+    ...buildStreamRelayFallbacks('leopoldina'),
+    ...buildFmRelayPair('radiofm_leopoldina'),
     port: 8270
   }),
   buildSoundstream({
@@ -252,8 +285,8 @@ export const streams = [
     host: 'srv.soundstream.com.br',
     slug: 'maravilhafmaraxa',
     streamUrl: 'https://srv.soundstream.com.br/listen/maravilhafmaraxa/live',
-    fmMonitorUrl: 'https://192.168.70.253:8873/radiofm_araxa',
-    fmFallbackUrl: 'https://streaming.grupogtf.com.br:8873/radiofm_araxa',
+    ...buildStreamRelayFallbacks('araxa'),
+    ...buildFmRelayPair('radiofm_araxa'),
     port: 8290
   }),
   buildSrvstm({

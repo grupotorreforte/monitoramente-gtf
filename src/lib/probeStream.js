@@ -1,11 +1,15 @@
 import { apiUrl } from './apiBaseUrl'
 
-export async function probeStream(streamUrl, fallbackUrl) {
+export async function probeStream(streamUrl, fallbackUrl, fallbackUrls = []) {
   const startedAt = performance.now()
   const params = new URLSearchParams({ url: streamUrl })
 
   if (fallbackUrl) {
     params.set('fallbackUrl', fallbackUrl)
+  }
+
+  if (fallbackUrls.length) {
+    params.set('fallbackUrls', JSON.stringify(fallbackUrls))
   }
 
   try {

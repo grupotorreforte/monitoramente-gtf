@@ -122,6 +122,10 @@ function buildPlaybackUrl(stream, cacheBust = Date.now()) {
     params.set('fallbackUrl', stream.fallbackUrl)
   }
 
+  if (stream.fallbackUrls?.length) {
+    params.set('fallbackUrls', JSON.stringify(stream.fallbackUrls))
+  }
+
   return apiUrl(`/api/audio?${params.toString()}`)
 }
 
@@ -135,6 +139,10 @@ function buildFmPlaybackUrl(stream, cacheBust = Date.now()) {
 
   if (stream.fmFallbackUrl) {
     params.set('fallbackUrl', stream.fmFallbackUrl)
+  }
+
+  if (stream.fmFallbackUrls?.length) {
+    params.set('fallbackUrls', JSON.stringify(stream.fmFallbackUrls))
   }
 
   return apiUrl(`/api/audio?${params.toString()}`)
@@ -653,7 +661,8 @@ export default function App() {
       .map((stream) => ({
         id: stream.id,
         streamUrl: stream.fmMonitorUrl,
-        fallbackUrl: stream.fmFallbackUrl
+        fallbackUrl: stream.fmFallbackUrl,
+        fallbackUrls: stream.fmFallbackUrls
       }))
 
     setFmProbeStates((state) => {

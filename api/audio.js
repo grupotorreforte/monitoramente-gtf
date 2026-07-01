@@ -1,4 +1,4 @@
-import { handleOptions, sendJson, setCors } from './_monitor.js'
+import { buildAttemptUrls, handleOptions, sendJson, setCors } from './_monitor.js'
 
 export const config = {
   maxDuration: 30
@@ -30,7 +30,7 @@ export default async function handler(req, res) {
     return
   }
 
-  const attempts = [req.query.url, req.query.fallbackUrl].filter(Boolean)
+  const attempts = buildAttemptUrls(req.query.url, req.query.fallbackUrl, req.query.fallbackUrls)
 
   if (attempts.length === 0) {
     sendJson(res, 400, { error: 'Parâmetro url é obrigatório.' })

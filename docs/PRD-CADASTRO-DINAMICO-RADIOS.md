@@ -50,6 +50,7 @@ Exemplo:
   "version": 1,
   "fmBases": {
     "internal": "https://192.168.70.253:8873",
+    "internalHttp": "http://192.168.70.253:8870",
     "external": "https://streaming.grupogtf.com.br:8873"
   },
   "streams": [
@@ -65,12 +66,18 @@ Exemplo:
       "stream": {
         "path": "varginha",
         "primaryUrl": "https://192.168.70.253:8873/varginha",
-        "fallbackUrl": "https://streaming.grupogtf.com.br:8873/varginha"
+        "fallbackUrl": "https://streaming.grupogtf.com.br:8873/varginha",
+        "fallbackUrls": [
+          "http://192.168.70.253:8870/varginha"
+        ]
       },
       "fm": {
         "path": "radiofm_varginha",
         "primaryUrl": "https://192.168.70.253:8873/radiofm_varginha",
-        "fallbackUrl": "https://streaming.grupogtf.com.br:8873/radiofm_varginha"
+        "fallbackUrl": "https://streaming.grupogtf.com.br:8873/radiofm_varginha",
+        "fallbackUrls": [
+          "http://192.168.70.253:8870/radiofm_varginha"
+        ]
       },
       "metadataUrl": null
     }
@@ -96,9 +103,10 @@ Ao cadastrar uma radio com base no conf:
 
 1. Identificar o path normal, se existir.
 2. Identificar o path `radiofm_`, se existir.
-3. Gerar URLs internas com `https://192.168.70.253:8873`.
-4. Gerar URLs externas com `https://streaming.grupogtf.com.br:8873`.
-5. Preencher `stream.primaryUrl`, `stream.fallbackUrl`, `fm.primaryUrl` e `fm.fallbackUrl`.
+3. Gerar URLs internas HTTPS com `https://192.168.70.253:8873`.
+4. Gerar URLs internas HTTP com `http://192.168.70.253:8870`.
+5. Gerar URLs externas com `https://streaming.grupogtf.com.br:8873`.
+6. Preencher `stream.primaryUrl`, `stream.fallbackUrls`, `stream.fallbackUrl`, `fm.primaryUrl`, `fm.fallbackUrls` e `fm.fallbackUrl`.
 
 ## 8. Requisitos Funcionais
 
@@ -107,6 +115,7 @@ Ao cadastrar uma radio com base no conf:
 - RF-03: Editar nome, cidade, estado, frequencia e ordem.
 - RF-04: Configurar canal `STREAMING` com URL primaria e fallback.
 - RF-05: Configurar canal `FM` com URL primaria e fallback.
+- RF-05A: Permitir multiplos fallbacks por canal, incluindo HTTP interno e HTTPS externo.
 - RF-06: Permitir gerar URLs automaticamente a partir de paths do servidor Dell.
 - RF-07: Ativar ou desativar radio do painel.
 - RF-08: Validar duplicidade de `id`.
@@ -180,4 +189,3 @@ Ao cadastrar uma radio com base no conf:
 ## 14. Recomendacao Final
 
 A melhor proxima etapa e migrar o catalogo para um `streams.json` externo com schema validado. Isso reduz risco operacional imediatamente sem exigir banco de dados ou tela administrativa completa no primeiro momento.
-

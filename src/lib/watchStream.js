@@ -1,10 +1,14 @@
 import { apiUrl } from './apiBaseUrl'
 
-export function watchStream({ streamUrl, fallbackUrl, onStatus, onError }) {
+export function watchStream({ streamUrl, fallbackUrl, fallbackUrls = [], onStatus, onError }) {
   const params = new URLSearchParams({ url: streamUrl })
 
   if (fallbackUrl) {
     params.set('fallbackUrl', fallbackUrl)
+  }
+
+  if (fallbackUrls.length) {
+    params.set('fallbackUrls', JSON.stringify(fallbackUrls))
   }
 
   const eventSource = new EventSource(apiUrl(`/api/watch?${params.toString()}`))
@@ -56,7 +60,8 @@ export function watchStreams({ streams, onStatus, onError }) {
       streams.map((stream) => ({
         id: stream.id,
         streamUrl: stream.streamUrl,
-        fallbackUrl: stream.fallbackUrl
+        fallbackUrl: stream.fallbackUrl,
+        fallbackUrls: stream.fallbackUrls
       }))
     )
   })

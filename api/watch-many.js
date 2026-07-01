@@ -60,6 +60,7 @@ export default async function handler(req, res) {
         id: stream.id,
         url: stream.streamUrl,
         fallbackUrl: stream.fallbackUrl,
+        fallbackUrls: stream.fallbackUrls,
         res,
         shouldStop
       })

@@ -120,6 +120,29 @@ function normalizeSong(song) {
   }
 }
 
+function buildAttemptUrls(url, fallbackUrl, fallbackUrls = []) {
+  const parsedFallbackUrls =
+    typeof fallbackUrls === 'string'
+      ? parseFallbackUrls(fallbackUrls)
+      : Array.isArray(fallbackUrls)
+        ? fallbackUrls
+        : []
+
+  return [...new Set([url, ...parsedFallbackUrls, fallbackUrl].filter(Boolean))]
+}
+
+function parseFallbackUrls(value) {
+  try {
+    const parsed = JSON.parse(value)
+    return Array.isArray(parsed) ? parsed : []
+  } catch {
+    return value
+      .split(',')
+      .map((item) => item.trim())
+      .filter(Boolean)
+  }
+}
+
 async function readStreamBytes(url, timeoutMs = DEFAULT_TIMEOUT_MS) {
   const controller = new AbortController()
   const startedAt = performance.now()
@@ -174,8 +197,8 @@ async function readStreamBytes(url, timeoutMs = DEFAULT_TIMEOUT_MS) {
   }
 }
 
-async function probeStream(url, fallbackUrl) {
-  const attempts = [url, fallbackUrl].filter(Boolean)
+async function probeStream(url, fallbackUrl, fallbackUrls = []) {
+  const attempts = buildAttemptUrls(url, fallbackUrl, fallbackUrls)
   let lastError = null
 
   for (const attemptUrl of attempts) {
@@ -199,8 +222,8 @@ async function probeStream(url, fallbackUrl) {
   }
 }
 
-async function proxyAudioStream({ req, res, url, fallbackUrl }) {
-  const attempts = [url, fallbackUrl].filter(Boolean)
+async function proxyAudioStream({ req, res, url, fallbackUrl, fallbackUrls = [] }) {
+  const attempts = buildAttemptUrls(url, fallbackUrl, fallbackUrls)
   let lastError = null
 
   for (const attemptUrl of attempts) {
@@ -277,8 +300,8 @@ async function proxyAudioStream({ req, res, url, fallbackUrl }) {
   })
 }
 
-async function monitorContinuousStream({ id, url, fallbackUrl, res, isClosed }) {
-  const attempts = [url, fallbackUrl].filter(Boolean)
+async function monitorContinuousStream({ id, url, fallbackUrl, fallbackUrls = [], res, isClosed }) {
+  const attempts = buildAttemptUrls(url, fallbackUrl, fallbackUrls)
   let lastStatus = null
 
   const emitStatus = (payload) => {
@@ -453,19 +476,21 @@ const server = http.createServer(async (req, res) => {
     if (requestUrl.pathname === '/api/probe') {
       const streamUrl = requestUrl.searchParams.get('url')
       const fallbackUrl = requestUrl.searchParams.get('fallbackUrl')
+      const fallbackUrls = requestUrl.searchParams.get('fallbackUrls')
 
       if (!streamUrl) {
         sendJson(res, 400, { error: 'Parâmetro url é obrigatório.' })
         return
       }
 
-      sendJson(res, 200, await probeStream(streamUrl, fallbackUrl))
+      sendJson(res, 200, await probeStream(streamUrl, fallbackUrl, fallbackUrls))
       return
     }
 
     if (requestUrl.pathname === '/api/watch') {
       const streamUrl = requestUrl.searchParams.get('url')
       const fallbackUrl = requestUrl.searchParams.get('fallbackUrl')
+      const fallbackUrls = requestUrl.searchParams.get('fallbackUrls')
 
       if (!streamUrl) {
         sendJson(res, 400, { error: 'Parâmetro url é obrigatório.' })
@@ -503,6 +528,7 @@ const server = http.createServer(async (req, res) => {
       await monitorContinuousStream({
         url: streamUrl,
         fallbackUrl,
+        fallbackUrls,
         res,
         isClosed: () => closed
       })
@@ -515,6 +541,7 @@ const server = http.createServer(async (req, res) => {
     if (requestUrl.pathname === '/api/audio') {
       const streamUrl = requestUrl.searchParams.get('url')
       const fallbackUrl = requestUrl.searchParams.get('fallbackUrl')
+      const fallbackUrls = requestUrl.searchParams.get('fallbackUrls')
 
       if (!streamUrl) {
         sendJson(res, 400, { error: 'Parâmetro url é obrigatório.' })
@@ -525,7 +552,8 @@ const server = http.createServer(async (req, res) => {
         req,
         res,
         url: streamUrl,
-        fallbackUrl
+        fallbackUrl,
+        fallbackUrls
       })
 
       return
@@ -585,6 +613,7 @@ const server = http.createServer(async (req, res) => {
             id: stream.id,
             url: stream.streamUrl,
             fallbackUrl: stream.fallbackUrl,
+            fallbackUrls: stream.fallbackUrls,
             res,
             isClosed: () => closed
           })

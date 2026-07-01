@@ -54,7 +54,6 @@ function buildSrvstm({ id, name, city, state = 'MG', frequency, streamUrl, fmMon
     metadataOfflineMeansDown: false
   }
 }
-
 export const streams = [
     buildSrvstm({
     id: '88-fm-sede-belo-horizonte',
@@ -62,16 +61,17 @@ export const streams = [
     city: 'Volta Redonda',
     state: 'RJ',
     frequency: '88,7 MHz',
-    // fmMonitorUrl: 'ADICIONE_AQUI_O_LINK_DO_FM',
-    streamUrl: 'https://stm39.srvstm.com:9776/stream'
+    streamUrl: 'https://stm39.srvstm.com:9776/stream',
+    
   }),
   buildSrvstm({
     id: 'maravilha-fm-sede-belo-horizonte',
     name: '89 Maravilha FM - SEDE',
     city: 'Belo Horizonte',
     frequency: '89,1 MHz',
-    // fmMonitorUrl: 'ADICIONE_AQUI_O_LINK_DO_FM',
-    streamUrl: 'https://stm19.srvstm.com:7080/stream'
+    streamUrl: 'https://stm19.srvstm.com:7080/stream',
+    fmMonitorUrl: 'https://192.168.70.253:8873/radiofm_89fm',
+    fmFallbackUrl: 'https://streaming.grupogtf.com.br:8873/radiofm_89fm',
   }),
   buildSoundstream({
     id: 'maravilha-fm-cambui',
@@ -127,9 +127,10 @@ export const streams = [
     host: 'srv.soundstream.com.br',
     slug: 'maravilhafmjf',
     port: 8030,
-    fmMonitorUrl: 'ADICIONE_AQUI_O_LINK_DO_FM',
+    fmMonitorUrl: 'https://192.168.70.253:8873/radiofm_juizdefora',
     streamUrl: 'https://srv.soundstream.com.br:8030/live',
     fallbackUrl: "https://srv.soundstream.com.br:8030/live",
+    fmFallbackUrl: 'https://streaming.grupogtf.com.br:8873/radiofm_juizdefora',
     metadataUrl: null
   }),
   buildSoundstream({
@@ -142,6 +143,7 @@ export const streams = [
     port: 8180,
     streamUrl: 'https://srv.soundstream.com.br/listen/maravilhafm/live',
     fmMonitorUrl: 'https://192.168.70.253:8873/radiofm_joaopinheiro',
+    fmFallbackUrl: 'https://streaming.grupogtf.com.br:8873/radiofm_joaopinheiro',
     aliases: ['Rádio Maravilha FM']
   }),
   buildSoundstream({
@@ -153,7 +155,7 @@ export const streams = [
     slug: 'maravilhateofilootoni',
     streamUrl: 'https://srv.soundstream.com.br/listen/maravilhateofilootoni/live',
     fmMonitorUrl: 'https://192.168.70.253:8873/radiofm_teofilootoni',
-    fmFallbackUrl: 'http://streaming.grupogtf.com.br:8870/radiofm_teofilootoni',
+    fmFallbackUrl: 'https://streaming.grupogtf.com.br:8873/radiofm_teofilootoni',
     port: 8240
   }),
   buildSoundstream({
@@ -165,6 +167,7 @@ export const streams = [
     slug: 'maravilhacamposgerais',
     streamUrl: 'https://srv.soundstream.com.br/listen/maravilhacamposgerais/live',
     fmMonitorUrl: 'https://192.168.70.253:8873/radiofm_camposgerais',
+    fmFallbackUrl: 'https://streaming.grupogtf.com.br:8873/radiofm_camposgerais',
     port: 8170
   }),
   buildSoundstream({
@@ -176,7 +179,7 @@ export const streams = [
     slug: 'maravilhafmuba',
     streamUrl: 'https://srv.soundstream.com.br/listen/maravilhafmuba/live',
     fmMonitorUrl: 'https://192.168.70.253:8873/radiofm_uba',
-    fmFallbackUrl: 'http://streaming.grupogtf.com.br:8870/radiofm_uba',
+    fmFallbackUrl: 'https://streaming.grupogtf.com.br:8873/radiofm_uba',
     port: 8040
   }),
   buildSoundstream({
@@ -187,7 +190,7 @@ export const streams = [
     host: 'srv.soundstream.com.br',
     slug: 'maravilhafmmontesclaros',
     fmMonitorUrl: 'https://192.168.70.253:8873/radiofm_montesclaros',
-    fmFallbackUrl: 'http://streaming.grupogtf.com.br:8870/radiofm_montesclaros',
+    fmFallbackUrl: 'https://streaming.grupogtf.com.br:8873/radiofm_montesclaros',
     port: 8020
   }),
   buildSrvstm({
@@ -196,7 +199,7 @@ export const streams = [
     city: 'Uberlândia',
     frequency: '89,7 FM',
     fmMonitorUrl: 'https://192.168.70.253:8873/radiofm_uberlandia',
-    fmFallbackUrl: 'http://streaming.grupogtf.com.br:8870/radiofm_uberlandia',
+    fmFallbackUrl: 'https://streaming.grupogtf.com.br:8873/radiofm_uberlandia',
     streamUrl: 'https://stm6.srvstm.com:7076/stream'
   }),
   buildSrvstm({
@@ -205,7 +208,7 @@ export const streams = [
     city: 'Uberaba',
     frequency: '89,3 FM',
     fmMonitorUrl: 'https://192.168.70.253:8873/radiofm_uberaba',
-    fmFallbackUrl: 'http://streaming.grupogtf.com.br:8870/radiofm_uberaba',
+    fmFallbackUrl: 'https://streaming.grupogtf.com.br:8873/radiofm_uberaba',
     streamUrl: 'https://stm6.srvstm.com:7006/stream'
   }),
   buildSoundstream({
@@ -217,7 +220,7 @@ export const streams = [
     slug: 'maravilhafmleopoldina',
     streamUrl: 'https://srv.soundstream.com.br/listen/maravilhafmleopoldina/live',
     fmMonitorUrl: 'https://192.168.70.253:8873/radiofm_leopoldina',
-    fmFallbackUrl: 'http://streaming.grupogtf.com.br:8870/radiofm_leopoldina',
+    fmFallbackUrl: 'https://streaming.grupogtf.com.br:8873/radiofm_leopoldina',
     port: 8270
   }),
   buildSoundstream({
@@ -229,7 +232,7 @@ export const streams = [
     slug: 'maravilhafmaraxa',
     streamUrl: 'https://srv.soundstream.com.br/listen/maravilhafmaraxa/live',
     fmMonitorUrl: 'https://192.168.70.253:8873/radiofm_araxa',
-    fmFallbackUrl: 'http://streaming.grupogtf.com.br:8870/radiofm_araxa',
+    fmFallbackUrl: 'https://streaming.grupogtf.com.br:8873/radiofm_araxa',
     port: 8290
   })
 ]
